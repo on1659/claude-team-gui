@@ -14,13 +14,14 @@
 
 | 스킬 | 에이전트 수 | 사용량 | 비율 |
 |------|-----------|--------|------|
-| `/meeting` | 1개 (inline) | ~2,900 (추정) | **1x** |
-| `/meeting-multi` | 1개 (inline) | ~19,200 (추정) | **~6.6x** |
-| `/meeting-agent` | 8개 병렬 | **81,434** (실측) | **~28x** |
-| `/meeting-team` | 8개 병렬 | **85,165** (실측) | **~29x** |
+| `/meeting` | 1개 | **9,286** (실측) | **1x** |
+| `/meeting-multi` | 1개 | **12,109** (실측) | **1.3x** |
+| `/meeting-agent` | 8개 병렬 | **81,434** (실측) | **8.8x** |
+| `/meeting-team` | 8개 병렬 | **85,165** (실측) | **9.2x** |
 
-> meeting-agent vs meeting-team 차이: +3,731 토큰 (프로필 주입 비용, 약 4.6% 증가)
-> meeting/meeting-multi 은 이 대화 컨텍스트 내 실행이라 별도 측정 불가 → docs/02-skills.md 추정값 사용
+> **핵심 발견**: meeting vs meeting-multi 차이 작음(1.3x) — 8역할이지만 프롬프트가 하나라 컨텍스트 누적이 적음
+> meeting-agent는 meeting-multi 대비 **6.7배** 비쌈 — 8개 독립 인스턴스 비용
+> meeting-team은 meeting-agent 대비 +3,731 토큰(4.6%) — 프로필 주입 비용
 
 ---
 
