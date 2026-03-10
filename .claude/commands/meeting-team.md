@@ -1,16 +1,28 @@
 # /meeting-team - 지속 팀원 기반 멀티에이전트 회의
 
 ## 개요
-`~/.claude/meeting-team-profiles.md`에 정의된 팀원 프로필을 불러와
-각 팀원의 성격과 전문성을 가진 독립 서브에이전트로 병렬 실행.
+`~/.claude/meeting-team-profiles.md`에 정의된 팀원 프로필과
+`.claude/skills/` 의 역할별 전문 스킬을 함께 로드해
+각 팀원의 성격·전문성·방법론을 가진 독립 서브에이전트로 병렬 실행.
 
 `/meeting-agent`와 달리 역할이 아닌 **사람**으로 동작함.
+스킬 파일 덕분에 각 역할별 전문 프레임워크와 체크리스트를 적용해 분석.
 
 ---
 
-## Step 1: 프로필 로드 및 회의 설정
+## Step 1: 프로필 + 스킬 로드 및 회의 설정
 
-1. `~/.claude/meeting-team-profiles.md` 파일을 Read 도구로 읽어오세요.
+1. 다음 파일들을 Read 도구로 동시에 읽어오세요:
+   - `~/.claude/meeting-team-profiles.md` (팀원 프로필)
+   - `.claude/skills/skill-pd.md`
+   - `.claude/skills/skill-planner-research.md`
+   - `.claude/skills/skill-planner-strategy.md`
+   - `.claude/skills/skill-backend.md`
+   - `.claude/skills/skill-frontend.md`
+   - `.claude/skills/skill-qa.md`
+   - `.claude/skills/skill-ui.md`
+   - `.claude/skills/skill-ux.md`
+
 2. AskUserQuestion 도구로 다음을 확인하세요:
 
 **질문 1 - 회의 주제:**
@@ -28,18 +40,31 @@
 
 선택된 팀원 수만큼 **Agent 도구를 동시에(한 번에) 실행**하세요.
 
+각 팀원에 해당하는 스킬 파일 매핑:
+- 지민 (PD) → `skill-pd.md`
+- 현우 (기획자①) → `skill-planner-research.md`
+- 소연 (기획자②) → `skill-planner-strategy.md`
+- 태준 (개발자① BE) → `skill-backend.md`
+- 미래 (개발자② FE) → `skill-frontend.md`
+- 윤서 (QA) → `skill-qa.md`
+- 다은 (UI) → `skill-ui.md`
+- 승호 (UX) → `skill-ux.md`
+
 각 팀원 에이전트 프롬프트 구조:
 ```
 당신은 [이름]입니다. 다음은 당신의 프로필입니다:
 [해당 팀원의 프로필 전체 내용]
 
+## 당신의 전문 스킬셋
+[해당 역할의 스킬 파일 전체 내용]
+
 회의 주제: [주제]
 
-위 프로필의 성격과 말투 그대로 다음을 작성하세요:
-1. 이 주제에 대한 당신의 핵심 의견
-2. 우려사항 또는 리스크 (당신 전문성 관점에서)
-3. 제안하는 방향
-4. 다른 팀원에게 묻고 싶은 것 (1가지)
+위 프로필의 성격과 말투 그대로, 전문 스킬셋의 프레임워크를 활용해서 다음을 작성하세요:
+1. 이 주제에 대한 당신의 핵심 의견 (스킬셋의 판단 기준 적용)
+2. 우려사항 또는 리스크 (당신 전문성 관점에서, 구체적 수치나 체크리스트 활용)
+3. 제안하는 방향 (실행 가능한 수준으로 구체적으로)
+4. 다른 팀원에게 묻고 싶은 것 (1가지, 당신 역할에서 가장 중요한 미결 사항)
 
 반드시 프로필에 정의된 말투와 성격으로 답변하세요.
 다른 팀원의 의견은 모르는 상태입니다.
@@ -75,7 +100,7 @@
 
 ## 팀원 수정 방법
 
-`~/.claude/meeting-team-profiles.md` 파일을 직접 수정하면 됩니다.
-- 팀원 추가: 새 섹션 추가
-- 성격/말투 변경: 해당 항목 수정
-- 팀원 제거: 해당 섹션 삭제
+- `~/.claude/meeting-team-profiles.md` — 팀원 프로필 (이름, 성격, 말투)
+- `.claude/skills/skill-[역할].md` — 역할별 전문 방법론 (프레임워크, 체크리스트)
+
+두 파일을 함께 수정해야 완전한 팀원 업그레이드가 됩니다.
