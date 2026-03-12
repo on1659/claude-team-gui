@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Claude Team Office</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:#070710;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    min-height:100vh;
+    font-family:'Courier New', monospace;
+  }
+  .hdr { color:#4a4a6a; font-size:10px; letter-spacing:6px; margin-bottom:8px; text-transform:uppercase; }
+  .hdr em { color:#a78bfa; font-style:normal; }
+  canvas { image-rendering:pixelated; image-rendering:crisp-edges; border:1px solid #1a1a2e; cursor:crosshair; }
+  #tt {
+    position:fixed; background:rgba(8,8,20,.97); color:#ccc;
+    padding:10px 14px; border-radius:6px; font-size:12px; line-height:1.7;
+    pointer-events:none; display:none;
+    border:1px solid rgba(120,60,220,.35);
+    box-shadow:0 4px 24px rgba(0,0,0,.7);
+    z-index:99; min-width:160px;
+  }
+  #tt .n { font-size:13px; font-weight:700; color:#c4b5fd; }
+  #tt .r { font-size:11px; color:#888; }
+  .leg { display:flex; gap:14px; margin-top:8px; color:#3a3a5a; font-size:10px; letter-spacing:1px; }
+  .dot { display:inline-block; width:5px; height:5px; border-radius:50%; margin-right:3px; vertical-align:middle; }
+</style>
+</head>
+<body>
+<div class="hdr"><em>Claude</em> Team Office</div>
+<canvas id="c"></canvas>
+<div id="tt"></div>
+<div class="leg">
+  <span><span class="dot" style="background:#4ec9b0"></span>Active</span>
+  <span><span class="dot" style="background:#555"></span>Inactive</span>
+  <span>Hover for info</span>
+</div>
+
+<script>
+// ── Config ─────────────────────────────────────────────────────────────────
+const SC = 3, W = 320, H = 224;
+const cv = document.getElementById('c');
+const gx = cv.getContext('2d');
+cv.width = W * SC; cv.height = H * SC;
+gx.imageSmoothingEnabled = false;
+
+// ── Pixel Art Character Data (16×16) ────────────────────────────────────────
+const PX = {
+  jimin: {
+    p:{1:'#1a1a2e',2:'#f5d6b8',3:'#7c3aed',4:'#5b21b6',5:'#2d1b69',6:'#fbbf24',7:'#f59e0b',8:'#fff',9:'#1e1e1e'},
+    g:[[0,0,0,0,0,6,7,6,7,6,0,0,0,0,0,0],[0,0,0,0,6,7,6,7,6,7,6,0,0,0,0,0],[0,0,0,0,1,5,5,5,5,5,1,0,0,0,0,0],[0,0,0,1,5,5,5,5,5,5,5,1,0,0,0,0],[0,0,0,1,2,2,2,2,2,2,2,1,0,0,0,0],[0,0,0,1,2,9,2,2,2,9,2,1,0,0,0,0],[0,0,0,1,2,2,2,1,2,2,2,1,0,0,0,0],[0,0,0,0,1,2,2,2,2,2,1,0,0,0,0,0],[0,0,0,0,0,1,2,2,2,1,0,0,0,0,0,0],[0,0,0,0,1,3,3,3,3,3,1,0,0,0,0,0],[0,0,0,1,3,3,8,8,8,3,3,1,0,0,0,0],[0,0,1,3,3,3,3,3,3,3,3,3,1,0,0,0],[0,0,1,4,3,3,6,3,3,3,4,3,1,0,0,0],[0,0,0,1,1,3,3,3,3,1,1,0,0,0,0,0],[0,0,0,0,1,4,4,0,4,4,1,0,0,0,0,0],[0,0,0,0,1,1,1,0,1,1,1,0,0,0,0,0]]
+  },
+  hyunwoo: {
+    p:{1:'#1a1a2e',2:'#f5d6b8',3:'#3b82f6',4:'#1d4ed8',5:'#374151',6:'#60a5fa',7:'#fff',8:'#93c5fd',9:'#1e1e1e'},
+    g:[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,5,5,5,5,5,0,0,0,0,0,0],[0,0,0,0,5,5,5,5,5,5,5,0,0,0,0,0],[0,0,0,1,5,5,5,5,5,5,5,1,0,0,0,0],[0,0,0,1,2,2,2,2,2,2,2,1,0,0,0,0],[0,0,0,1,6,8,6,2,6,8,6,1,0,0,0,0],[0,0,0,1,2,9,2,6,2,9,2,1,0,0,0,0],[0,0,0,0,1,2,2,2,2,2,1,0,0,0,0,0],[0,0,0,0,0,1,2,2,2,1,0,0,0,0,0,0],[0,0,0,0,1,3,3,3,3,3,1,0,0,0,0,0],[0,0,0,1,3,3,3,3,3,3,3,1,0,0,0,0],[0,0,1,3,3,3,7,7,3,3,3,3,1,0,0,0],[0,0,1,4,3,3,3,3,3,3,4,3,1,0,0,0],[0,0,0,1,1,3,3,3,3,1,1,0,0,0,0,0],[0,0,0,0,1,4,4,0,4,4,1,0,0,0,0,0],[0,0,0,0,1,1,1,0,1,1,1,0,0,0,0,0]]
+  },
+  soyeon: {
+    p:{1:'#1a1a2e',2:'#f5d6b8',3:'#2563eb',4:'#1e40af',5:'#92400e',6:'#b45309',7:'#fff',8:'#fbbf24',9:'#1e1e1e'},
+    g:[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,5,5,5,5,5,5,0,0,0,0,0,0],[0,0,0,5,5,6,6,6,6,5,5,0,0,0,0,0],[0,0,5,1,5,5,5,5,5,5,1,5,0,0,0,0],[0,0,5,1,2,2,2,2,2,2,1,5,0,0,0,0],[0,0,5,1,2,9,2,2,2,9,1,5,0,0,0,0],[0,0,5,1,2,2,2,1,2,2,1,5,0,0,0,0],[0,0,5,0,1,2,2,2,2,1,0,5,0,0,0,0],[0,0,5,0,0,1,2,2,1,0,0,5,0,0,0,0],[0,0,0,0,1,3,3,3,3,3,1,0,0,0,0,0],[0,0,0,1,3,3,8,3,3,3,3,1,0,0,0,0],[0,0,1,3,3,3,3,3,3,3,3,3,1,0,0,0],[0,0,1,4,3,3,3,3,3,3,4,3,1,0,0,0],[0,0,0,1,1,3,3,3,3,1,1,0,0,0,0,0],[0,0,0,0,1,4,4,0,4,4,1,0,0,0,0,0],[0,0,0,0,1,1,1,0,1,1,1,0,0,0,0,0]]
+  },
+  taejun: {
+    p:{1:'#1a1a2e',2:'#f5d6b8',3:'#10b981',4:'#047857',5:'#1f2937',6:'#34d399',7:'#fff',8:'#6ee7b7',9:'#1e1e1e'},
+    g:[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,5,5,5,5,5,0,0,0,0,0,0],[0,0,0,0,5,5,5,5,5,5,5,0,0,0,0,0],[0,0,0,1,5,5,5,5,5,5,5,1,0,0,0,0],[0,0,0,1,2,2,2,2,2,2,2,1,0,0,0,0],[0,0,0,1,2,9,2,2,2,9,2,1,0,0,0,0],[0,0,0,1,2,2,2,2,2,2,2,1,0,0,0,0],[0,0,0,0,1,2,2,2,2,2,1,0,0,0,0,0],[0,0,0,0,0,1,2,2,2,1,0,0,0,0,0,0],[0,0,0,3,1,3,3,3,3,3,1,3,0,0,0,0],[0,0,3,3,3,3,3,3,3,3,3,3,3,0,0,0],[0,0,3,3,3,8,8,3,8,8,3,3,3,0,0,0],[0,0,1,4,3,8,6,3,6,8,3,4,1,0,0,0],[0,0,0,1,1,3,3,3,3,1,1,0,0,0,0,0],[0,0,0,0,1,1,1,0,1,1,1,0,0,0,0,0],[0,0,0,0,1,1,1,0,1,1,1,0,0,0,0,0]]
+  },
+  mirae: {
+    p:{1:'#1a1a2e',2:'#f5d6b8',3:'#06b6d4',4:'#0891b2',5:'#4b5563',6:'#9ca3af',7:'#fff',8:'#67e8f9',9:'#1e1e1e'},
+    g:[[0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0],[0,0,0,0,0,5,5,5,5,5,5,5,0,0,0,0],[0,0,0,0,5,5,6,6,6,5,5,5,0,0,0,0],[0,0,0,1,5,5,5,5,5,5,1,5,0,0,0,0],[0,0,0,1,2,2,2,2,2,2,1,0,5,0,0,0],[0,0,0,1,2,9,2,2,2,9,1,0,0,5,0,0],[0,0,0,1,2,2,2,2,2,2,1,0,0,5,0,0],[0,0,0,0,1,2,2,2,2,1,0,0,0,5,0,0],[0,0,0,0,0,1,2,2,1,0,0,0,0,0,0,0],[0,0,0,0,1,3,3,3,3,3,1,0,0,0,0,0],[0,0,0,1,3,3,7,7,3,3,3,1,0,0,0,0],[0,0,1,3,3,3,3,3,3,3,3,3,1,0,0,0],[0,0,1,4,3,3,3,3,3,3,4,3,1,0,0,0],[0,0,0,1,1,3,3,3,3,1,1,0,0,0,0,0],[0,0,0,0,1,4,4,0,4,4,1,0,0,0,0,0],[0,0,0,0,1,1,1,0,1,1,1,0,0,0,0,0]]
+  },
+  yunseo: {
+    p:{1:'#1a1a2e',2:'#f5d6b8',3:'#eab308',4:'#ca8a04',5:'#374151',6:'#fbbf24',7:'#fff',8:'#fde047',9:'#1e1e1e'},
+    g:[[0,0,0,0,6,6,6,6,6,6,6,0,0,0,0,0],[0,0,0,6,3,3,8,3,8,3,3,6,0,0,0,0],[0,0,0,0,1,5,5,5,5,5,1,0,0,0,0,0],[0,0,0,1,5,5,5,5,5,5,5,1,0,0,0,0],[0,0,0,1,2,2,2,2,2,2,2,1,0,0,0,0],[0,0,0,1,2,9,2,2,2,9,2,1,0,0,0,0],[0,0,0,1,2,2,2,2,2,2,2,1,0,0,0,0],[0,0,0,0,1,2,2,2,2,2,1,0,0,0,0,0],[0,0,0,0,0,1,2,2,2,1,0,0,0,0,0,0],[0,0,0,0,1,3,3,3,3,3,1,0,0,0,0,0],[0,0,0,1,3,3,7,7,3,3,3,1,0,0,0,0],[0,0,1,3,3,3,3,3,3,3,3,3,1,0,0,0],[0,0,1,4,3,3,3,3,3,3,4,3,1,0,0,0],[0,0,0,1,1,3,3,3,3,1,1,0,0,0,0,0],[0,0,0,0,1,4,4,0,4,4,1,0,0,0,0,0],[0,0,0,0,1,1,1,0,1,1,1,0,0,0,0,0]]
+  },
+  daeun: {
+    p:{1:'#1a1a2e',2:'#f5d6b8',3:'#ec4899',4:'#be185d',5:'#78350f',6:'#f472b6',7:'#fff',8:'#f9a8d4',9:'#1e1e1e'},
+    g:[[0,0,0,0,3,3,3,3,3,0,0,0,0,0,0,0],[0,0,0,3,6,6,6,6,6,3,0,0,0,0,0,0],[0,0,0,0,5,5,5,5,5,5,5,0,0,0,0,0],[0,0,5,1,5,5,5,5,5,5,1,5,0,0,0,0],[0,0,5,1,2,2,2,2,2,2,1,5,0,0,0,0],[0,0,5,1,2,9,2,2,2,9,1,5,0,0,0,0],[0,0,0,1,2,2,2,2,2,2,1,0,0,0,0,0],[0,0,0,0,1,2,8,2,2,1,0,0,0,0,0,0],[0,0,0,0,0,1,2,2,1,0,0,0,0,0,0,0],[0,0,0,0,1,3,3,3,3,3,1,0,0,0,0,0],[0,0,0,1,3,3,7,7,3,3,3,1,0,0,0,0],[0,0,1,3,3,3,3,3,3,3,3,3,1,0,0,0],[0,0,1,4,3,3,3,3,3,3,4,3,1,0,0,0],[0,0,0,1,1,3,3,3,3,1,1,0,0,0,0,0],[0,0,0,0,1,4,4,0,4,4,1,0,0,0,0,0],[0,0,0,0,1,1,1,0,1,1,1,0,0,0,0,0]]
+  },
+  seungho: {
+    p:{1:'#1a1a2e',2:'#f5d6b8',3:'#f97316',4:'#c2410c',5:'#1f2937',6:'#fb923c',7:'#fff',8:'#fdba74',9:'#1e1e1e'},
+    g:[[0,0,0,0,0,4,4,4,4,4,0,0,0,0,0,0],[0,0,0,0,4,3,3,6,3,3,4,0,0,0,0,0],[0,0,0,0,1,5,5,5,5,5,1,0,0,0,0,0],[0,0,0,1,5,5,5,5,5,5,5,1,0,0,0,0],[0,0,0,1,2,2,2,2,2,2,2,1,0,0,0,0],[0,0,0,1,2,9,2,2,2,9,2,1,0,0,0,0],[0,0,0,1,2,2,2,2,2,2,2,1,0,0,0,0],[0,0,0,0,1,2,2,2,2,2,1,0,0,0,0,0],[0,0,0,0,0,1,2,2,2,1,0,0,0,0,0,0],[0,0,0,0,1,3,3,3,3,3,1,0,0,0,0,0],[0,0,0,1,3,3,7,3,7,3,3,1,0,0,0,0],[0,0,1,3,3,3,3,3,3,3,3,3,1,0,0,0],[0,0,1,4,3,3,3,3,3,3,4,3,1,0,0,0],[0,0,0,1,1,3,3,3,3,1,1,0,0,0,0,0],[0,0,0,0,1,4,4,0,4,4,1,0,0,0,0,0],[0,0,0,0,1,1,1,0,1,1,1,0,0,0,0,0]]
+  }
+};
+
+// ── Team Data ───────────────────────────────────────────────────────────────
+const TEAM = {
+  jimin:   { name:'지민',  role:'PD · 프로젝트 디렉터',  sal:'high',   md:'Opus',   exp:'10y Senior', active:true  },
+  hyunwoo: { name:'현우',  role:'기획 · 리서치',         sal:'medium', md:'Sonnet', exp:'5y Mid',     active:true  },
+  soyeon:  { name:'소연',  role:'기획 · 전략',           sal:'medium', md:'Sonnet', exp:'8y Senior',  active:true  },
+  taejun:  { name:'태준',  role:'백엔드 개발',            sal:'medium', md:'Sonnet', exp:'6y Mid',     active:true  },
+  mirae:   { name:'미래',  role:'프론트엔드 개발',         sal:'medium', md:'Sonnet', exp:'3y Junior',  active:true  },
+  yunseo:  { name:'윤서',  role:'QA',                   sal:'medium', md:'Sonnet', exp:'5y Mid',     active:true  },
+  daeun:   { name:'다은',  role:'UI 디자인',             sal:'medium', md:'Sonnet', exp:'4y Mid',     active:false },
+  seungho: { name:'승호',  role:'UX 디자인',             sal:'medium', md:'Sonnet', exp:'7y Mid',     active:true  },
+};
+const SCOL = { low:'#6ee7b7', medium:'#93c5fd', high:'#c4b5fd' };
+const SLBL = { low:'Haiku', medium:'Sonnet', high:'Opus' };
+
+// ── Workstations ────────────────────────────────────────────────────────────
+const STATIONS = [
+  { id:'jimin',   dx:14,  dy:40  },
+  { id:'hyunwoo', dx:54,  dy:40  },
+  { id:'soyeon',  dx:192, dy:40  },
+  { id:'taejun',  dx:232, dy:40  },
+  { id:'mirae',   dx:14,  dy:136 },
+  { id:'yunseo',  dx:54,  dy:136 },
+  { id:'daeun',   dx:192, dy:136 },
+  { id:'seungho', dx:232, dy:136 },
+];
+STATIONS.forEach(s => {
+  s.cx = s.dx + 8;   // center 16px sprite under 32px desk
+  s.cy = s.dy + 20;  // below desk surface
+});
+
+// ── Drawing Helpers ─────────────────────────────────────────────────────────
+function f(x, y, w, h, c) { gx.fillStyle = c; gx.fillRect(x, y, w, h); }
+
+// ── Floor ────────────────────────────────────────────────────────────────────
+function drawFloor() {
+  for (let ty = 0; ty < H; ty += 16) {
+    for (let tx = 0; tx < W; tx += 16) {
+      const odd = ((tx / 16 | 0) + (ty / 16 | 0)) % 2;
+      f(tx, ty, 16, 16, odd ? '#181825' : '#1d1d2b');
+      // Grout lines
+      f(tx, ty, 16, 1, '#111120');
+      f(tx, ty, 1, 16, '#111120');
+      // Subtle shine on some tiles
+      if ((tx * 5 + ty * 7) % 113 === 0) {
+        gx.fillStyle = 'rgba(255,255,255,.04)';
+        gx.fillRect(tx + 2, ty + 2, 8, 4);
+      }
+    }
+  }
+}
+
+// ── Walls ────────────────────────────────────────────────────────────────────
+function drawWalls() {
+  // Top wall base
+  f(0, 0, W, 30, '#22223a');
+  f(0, 28, W, 2, '#30304e');
+  // Wall panels
+  for (let x = 0; x < W; x += 40) {
+    f(x + 2, 4, 36, 22, '#282840');
+    gx.fillStyle = 'rgba(255,255,255,.05)';
+    gx.fillRect(x + 3, 5, 34, 1);
+    gx.fillRect(x + 3, 5, 1, 20);
+  }
+  // Windows
+  [20, 132, 244].forEach(wx => drawWindow(wx, 4, 38, 20));
+  // Side walls
+  f(0, 0, 8, H, '#1a1a2e');
+  f(W - 8, 0, 8, H, '#1a1a2e');
+  // Bottom wall
+  f(0, H - 16, W, 16, '#22223a');
+  f(0, H - 16, W, 2, '#30304e');
+  // Door
+  f(146, H - 16, 28, 16, '#2a1a0c');
+  f(148, H - 14, 24, 14, '#3a2818');
+  f(148, H - 14, 24, 2, '#4a3828');
+  f(168, H - 7, 3, 3, '#c4b5fd');  // doorknob glow
+  gx.fillStyle = 'rgba(180,150,255,.3)';
+  gx.fillRect(168, H - 7, 3, 3);
+}
+
+function drawWindow(x, y, w, h) {
+  f(x, y, w, h, '#30304e');
+  f(x + 2, y + 2, w - 4, h - 4, '#101028');
+  gx.fillStyle = 'rgba(60, 100, 180, .2)';
+  gx.fillRect(x + 2, y + 2, w - 4, h - 4);
+  // Cross bar
+  f(x + (w / 2 | 0) - 1, y, 2, h, '#30304e');
+  f(x, y + (h / 2 | 0) - 1, w, 2, '#30304e');
+  // Glow below
+  gx.fillStyle = 'rgba(80, 130, 220, .06)';
+  for (let i = 1; i <= 8; i++) gx.fillRect(x - 1, y + h, w + 2, i * 4);
+  // Corner stars
+  f(x + 2, y + 2, 1, 1, 'rgba(200,220,255,.3)');
+}
+
+// ── Furniture ────────────────────────────────────────────────────────────────
+function drawDesk(x, y) {
+  f(x, y, 32, 2, '#4a3018');
+  f(x, y + 2, 32, 10, '#342010');
+  gx.fillStyle = 'rgba(255,255,255,.10)';
+  gx.fillRect(x + 1, y + 2, 30, 1);
+  f(x, y + 12, 32, 4, '#241608');
+  gx.fillStyle = 'rgba(255,255,255,.04)';
+  gx.fillRect(x + 1, y + 12, 30, 1);
+  f(x + 2, y + 14, 2, 2, '#180e04');
+  f(x + 28, y + 14, 2, 2, '#180e04');
+}
+
+function drawMonitor(x, y, id) {
+  const MCOL = {
+    jimin: '#c4b5fd', hyunwoo: '#93c5fd', soyeon: '#60a5fa',
+    taejun: '#34d399', mirae: '#22d3ee', yunseo: '#fde047',
+    daeun: '#f472b6', seungho: '#fb923c',
+  };
+  const c = MCOL[id] || '#a0a0c0';
+  f(x, y, 14, 11, '#141424');
+  f(x + 1, y + 1, 12, 8, '#0a0f1e');
+  // Screen glow
+  gx.fillStyle = c + '18';
+  gx.fillRect(x + 1, y + 1, 12, 8);
+  // Content lines
+  f(x + 2, y + 2, 6, 1, c);
+  f(x + 2, y + 4, 9, 1, c + 'aa');
+  f(x + 3, y + 6, 4, 1, c + '66');
+  // Screen border
+  gx.strokeStyle = c + '50';
+  gx.lineWidth = 0.5;
+  gx.strokeRect(x + 0.5, y + 0.5, 13, 9.5);
+  // Stand
+  f(x + 5, y + 9, 4, 2, '#1e1e30');
+  f(x + 4, y + 10, 6, 1, '#1e1e30');
+}
+
+function drawKeyboard(x, y) {
+  f(x, y, 10, 3, '#1a1a2e');
+  for (let i = 0; i < 4; i++) f(x + 1 + i * 2, y + 1, 1, 1, 'rgba(255,255,255,.15)');
+}
+
+function drawChair(x, y) {
+  f(x, y, 14, 5, '#202032');
+  f(x + 1, y + 1, 12, 3, '#282840');
+  f(x, y, 1, 4, '#18182a');
+  f(x + 13, y, 1, 4, '#18182a');
+  f(x + 3, y + 5, 2, 1, '#141422');
+  f(x + 9, y + 5, 2, 1, '#141422');
+  f(x + 6, y + 5, 2, 1, '#141422');
+}
+
+function drawPlant(x, y) {
+  f(x + 1, y + 6, 5, 4, '#5c3020');
+  f(x, y + 5, 7, 2, '#7a4030');
+  f(x + 2, y + 5, 3, 1, '#150c06');
+  f(x + 2, y + 1, 3, 4, '#145c14');
+  f(x + 3, y, 2, 2, '#1a8018');
+  f(x, y + 2, 2, 3, '#0e460e');
+  f(x + 5, y + 2, 2, 3, '#0e460e');
+  gx.fillStyle = 'rgba(80,220,80,.25)';
+  gx.fillRect(x + 3, y + 1, 1, 1);
+}
+
+function drawRug(x, y, w, h) {
+  f(x, y, w, h, '#2a1830');
+  f(x + 2, y + 2, w - 4, h - 4, '#361e3e');
+  f(x + 3, y + 3, w - 6, h - 6, '#3e2448');
+  const mx = x + (w / 2 | 0), my = y + (h / 2 | 0);
+  [0,1,2,3].forEach(i => {
+    const r2 = 5 - i;
+    gx.fillStyle = `rgba(${100 + i * 20},${40 + i * 10},${160 + i * 10},.${4-i})`;
+    gx.fillRect(mx - r2, my, r2 * 2, 1);
+    gx.fillRect(mx - r2 + 1, my - i, (r2 - 1) * 2, 1);
+    gx.fillRect(mx - r2 + 1, my + i, (r2 - 1) * 2, 1);
+  });
+  for (let i = x + 4; i < x + w - 3; i += 6) f(i, y + 2, 3, 1, '#5020a0');
+  for (let i = x + 4; i < x + w - 3; i += 6) f(i, y + h - 3, 3, 1, '#5020a0');
+}
+
+function drawBookshelf(x, y) {
+  f(x, y, 28, 22, '#2a1808');
+  for (let i = 0; i < 3; i++) {
+    const sy = y + 1 + i * 7;
+    f(x + 1, sy, 26, 6, '#381e0c');
+    f(x + 1, sy + 6, 26, 1, '#1a0c04');
+    const bc = ['#c0392b','#2980b9','#27ae60','#d35400','#8e44ad','#16a085','#c0392b','#f39c12'];
+    let bx = x + 2;
+    for (let j = 0; j < 7; j++) {
+      const bw = j % 3 === 0 ? 3 : 2, bh = 3 + (j % 2);
+      f(bx, sy + (5 - bh), bw, bh, bc[(i * 7 + j) % bc.length]);
+      bx += bw + 1;
+    }
+  }
+}
+
+function drawWhiteboard(x, y) {
+  f(x, y, 32, 20, '#2a2a3e');
+  f(x + 2, y + 2, 28, 14, '#d8d8d0');
+  f(x + 3, y + 3, 12, 1, '#333');
+  f(x + 3, y + 5, 16, 1, '#333');
+  f(x + 3, y + 8, 8, 1, '#c0392b');
+  f(x + 13, y + 8, 10, 1, '#2980b9');
+  f(x + 3, y + 11, 14, 1, '#27ae60');
+  f(x + 3, y + 17, 26, 2, '#3a3a50');
+  f(x + 5, y + 17, 3, 1, '#c0392b');
+  f(x + 10, y + 17, 3, 1, '#2980b9');
+  f(x + 15, y + 17, 3, 1, '#27ae60');
+}
+
+function drawCoffeeMachine(x, y) {
+  f(x, y + 10, 14, 8, '#2a1808');
+  f(x + 1, y + 10, 12, 1, '#381e0c');
+  f(x + 2, y + 2, 10, 9, '#14142a');
+  f(x + 3, y + 3, 8, 6, '#1e1e35');
+  f(x + 6, y + 7, 2, 3, '#2a2a45');
+  f(x + 5, y + 8, 4, 2, '#ddd');
+  f(x + 6, y + 8, 2, 1, '#5c2e10');
+  f(x + 3, y + 3, 2, 1, '#20cc40');
+  gx.fillStyle = 'rgba(80,200,80,.25)';
+  gx.fillRect(x + 3, y, 2, 4);
+}
+
+// ── Character Rendering ──────────────────────────────────────────────────────
+function drawCharacter(id, x, y, bob) {
+  const yy = y + (bob || 0);
+  const info = TEAM[id];
+  const px = PX[id];
+
+  // Shadow
+  gx.save();
+  gx.fillStyle = 'rgba(0,0,0,.35)';
+  gx.beginPath();
+  gx.ellipse(x + 8, yy + 17, 7, 2, 0, 0, Math.PI * 2);
+  gx.fill();
+  gx.restore();
+
+  if (px) {
+    if (info && !info.active) gx.globalAlpha = 0.4;
+    for (let py = 0; py < 16; py++) {
+      for (let px2 = 0; px2 < 16; px2++) {
+        const ci = px.g[py][px2];
+        if (!ci) continue;
+        gx.fillStyle = px.p[ci];
+        gx.fillRect(x + px2, yy + py, 1, 1);
+      }
+    }
+    gx.globalAlpha = 1;
+    if (info && !info.active) {
+      gx.fillStyle = 'rgba(0,0,0,.4)';
+      gx.fillRect(x, yy, 16, 16);
+    }
+  }
+
+  if (info) drawLabel(x + 8, yy + 18, info.name, info.active);
+}
+
+function drawLabel(midX, y, name, active) {
+  const lw = name.length * 5 + 6, lx = midX - (lw / 2 | 0);
+  gx.fillStyle = active ? 'rgba(15,15,35,.9)' : 'rgba(15,15,35,.6)';
+  gx.fillRect(lx, y, lw, 7);
+  gx.fillStyle = active ? '#4ec9b0' : '#555';
+  gx.fillRect(lx + 2, y + 2, 2, 2);
+  gx.fillStyle = active ? '#ddd' : '#777';
+  gx.font = '5px monospace';
+  gx.textBaseline = 'top';
+  gx.fillText(name, lx + 5, y + 1);
+}
+
+// ── Workstation ──────────────────────────────────────────────────────────────
+const ACCENTCOL = {
+  jimin:'#c4b5fd', hyunwoo:'#93c5fd', soyeon:'#60a5fa', taejun:'#34d399',
+  mirae:'#22d3ee', yunseo:'#fde047', daeun:'#f472b6', seungho:'#fb923c',
+};
+
+function drawStation(st, t) {
+  const { id, dx, dy, cx: cdx, cy: cdy } = st;
+  const ph = STATIONS.indexOf(st) * 1.4;
+  const bob = Math.round(Math.sin(t * 0.002 + ph) * 0.6);
+
+  drawChair(cdx - 1, cdy + 28);
+  drawDesk(dx, dy);
+  drawMonitor(dx + 9, dy + 1, id);
+  drawKeyboard(dx + 12, dy + 8);
+
+  // Role-color accent dot on desk
+  const ac = ACCENTCOL[id] || '#aaa';
+  f(dx + 26, dy + 3, 3, 3, ac + '66');
+  f(dx + 27, dy + 4, 1, 1, ac);
+
+  drawCharacter(id, cdx, cdy, bob);
+}
+
+// ── Render Loop ──────────────────────────────────────────────────────────────
+let hov = null;
+
+function render(t) {
+  gx.save();
+  gx.scale(SC, SC);
+
+  drawFloor();
+  drawWalls();
+
+  // Decorations
+  drawBookshelf(92, 28);
+  drawWhiteboard(246, 28);
+  drawRug(110, 96, 82, 30);
+  drawCoffeeMachine(138, 54);
+  [[104, 72], [264, 72], [104, 166], [264, 166]].forEach(([px, py]) => drawPlant(px, py));
+
+  // Workstations (depth-sorted by row)
+  STATIONS.filter(s => s.dy < 100).forEach(s => drawStation(s, t));
+  STATIONS.filter(s => s.dy >= 100).forEach(s => drawStation(s, t));
+
+  // Window ambient glow
+  [20, 132, 244].forEach(wx => {
+    const g = gx.createLinearGradient(wx, 24, wx, 100);
+    g.addColorStop(0, 'rgba(80,120,220,.08)');
+    g.addColorStop(1, 'rgba(80,120,220,0)');
+    gx.fillStyle = g;
+    gx.fillRect(wx, 24, 38, 76);
+  });
+
+  // Hover ring
+  if (hov) {
+    gx.strokeStyle = 'rgba(167,139,250,.75)';
+    gx.lineWidth = 0.5;
+    gx.strokeRect(hov.cx - 0.5, hov.cy - 0.5, 17, 17);
+  }
+
+  gx.restore();
+  requestAnimationFrame(render);
+}
+
+// ── Mouse Interaction ────────────────────────────────────────────────────────
+const ttEl = document.getElementById('tt');
+
+cv.addEventListener('mousemove', e => {
+  const rc = cv.getBoundingClientRect();
+  const mx = (e.clientX - rc.left) / SC, my = (e.clientY - rc.top) / SC;
+  hov = null;
+  for (const s of STATIONS) {
+    if (mx >= s.cx && mx < s.cx + 16 && my >= s.cy && my < s.cy + 16) { hov = s; break; }
+  }
+  if (hov) {
+    const inf = TEAM[hov.id], sc = SCOL[inf.sal];
+    ttEl.innerHTML = `
+      <div class="n">${inf.name}</div>
+      <div class="r">${inf.role}</div>
+      <div style="font-size:11px;color:#666;margin-top:2px">${inf.exp}</div>
+      <div style="margin-top:5px">
+        <span style="background:${sc}22;color:${sc};border:1px solid ${sc}44;padding:1px 6px;border-radius:3px;font-size:10px">${SLBL[inf.sal]} · ${inf.md}</span>
+      </div>
+      <div style="font-size:10px;margin-top:4px;color:${inf.active ? '#4ec9b0' : '#666'}">${inf.active ? '● Active' : '○ Inactive'}</div>
+    `;
+    ttEl.style.display = 'block';
+    ttEl.style.left = (e.clientX + 14) + 'px';
+    ttEl.style.top = (e.clientY - 8) + 'px';
+    cv.style.cursor = 'pointer';
+  } else {
+    ttEl.style.display = 'none';
+    cv.style.cursor = 'crosshair';
+  }
+});
+
+cv.addEventListener('mouseleave', () => { ttEl.style.display = 'none'; hov = null; });
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Team GUI — VS Code Extension Mockup</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* === VS Code 테마 변수 === */
+    :root {
+      --bg: #1e1e1e;
+      --bg-sidebar: #252526;
+      --bg-activity: #333333;
+      --bg-titlebar: #3c3c3c;
+      --bg-input: #3c3c3c;
+      --bg-tab: #2d2d2d;
+      --bg-tab-active: #1e1e1e;
+      --fg: #cccccc;
+      --fg-dim: #858585;
+      --fg-bright: #e0e0e0;
+      --fg-muted: #6a6a6a;
+      --border: #474747;
+      --border-s: #3a3a3a;
+      --accent: #007acc;
+      --accent-h: #1a8ad4;
+      --ok: #4ec9b0;
+      --warn: #cca700;
+      --err: #f14c4c;
+      --info: #3794ff;
+      --statusbar: #007acc;
+    }
+
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 13px;
+      color: var(--fg);
+      background: var(--bg);
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    /* === 쉘 === */
+    .shell { display:flex; flex-direction:column; height:100vh; }
+
+    /* 타이틀바 */
+    .titlebar {
+      display:flex; align-items:center; height:32px;
+      background:var(--bg-titlebar); padding:0 12px;
+    }
+    .dots { display:flex; gap:8px; margin-right:16px; }
+    .dots span { width:12px; height:12px; border-radius:50%; }
+    .dot-r { background:#ff5f56; } .dot-y { background:#ffbd2e; } .dot-g { background:#27c93f; }
+    .titlebar-t { font-size:12px; color:var(--fg-dim); flex:1; text-align:center; }
+
+    /* 메인 */
+    .main { display:flex; flex:1; overflow:hidden; }
+
+    /* Activity Bar */
+    .actbar {
+      width:48px; background:var(--bg-activity);
+      display:flex; flex-direction:column; align-items:center;
+      padding-top:4px; border-right:1px solid var(--border-s);
+    }
+    .act-icon {
+      width:48px; height:48px; display:flex; align-items:center; justify-content:center;
+      color:var(--fg-muted); cursor:pointer; position:relative;
+    }
+    .act-icon:hover { color:var(--fg); }
+    .act-icon.on { color:var(--fg-bright); }
+    .act-icon.on::before {
+      content:''; position:absolute; left:0; top:8px; bottom:8px;
+      width:2px; background:var(--fg-bright); border-radius:0 2px 2px 0;
+    }
+
+    /* === 사이드바 === */
+    .sidebar {
+      width:280px; background:var(--bg-sidebar);
+      border-right:1px solid var(--border-s);
+      display:flex; flex-direction:column; overflow:hidden;
+    }
+    .sb-head {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:8px 12px; height:35px;
+    }
+    .sb-title { font-size:11px; font-weight:600; color:var(--fg-dim); text-transform:uppercase; letter-spacing:.5px; }
+    .sb-actions { display:flex; gap:2px; }
+    .ib {
+      background:none; border:none; color:var(--fg-dim);
+      cursor:pointer; width:22px; height:22px; display:flex;
+      align-items:center; justify-content:center; border-radius:4px;
+    }
+    .ib:hover { background:rgba(255,255,255,.08); color:var(--fg); }
+
+    /* 섹션 */
+    .sec { border-bottom:1px solid var(--border-s); }
+    .sec-h {
+      display:flex; align-items:center; gap:4px;
+      padding:6px 8px; font-size:11px; font-weight:600;
+      text-transform:uppercase; letter-spacing:.3px; color:var(--fg-dim);
+      cursor:pointer; user-select:none;
+    }
+    .sec-h:hover { background:rgba(255,255,255,.04); }
+    .sec-h svg { transition:transform .15s; flex-shrink:0; }
+    .sec-h.off svg { transform:rotate(-90deg); }
+    .badge {
+      margin-left:auto; background:rgba(255,255,255,.1);
+      padding:1px 6px; border-radius:10px; font-size:10px;
+    }
+    .sec-c { padding:4px 8px 8px; overflow-y:auto; }
+
+    /* 팀원 카드 */
+    .mc {
+      display:flex; align-items:flex-start; gap:10px;
+      padding:8px 10px; border-radius:6px; cursor:pointer;
+      transition:background .12s; margin-bottom:2px;
+    }
+    .mc:hover { background:rgba(255,255,255,.06); }
+    .mc.sel { background:rgba(0,122,204,.15); }
+    .mc.off { opacity:.4; }
+
+    .mc input[type="checkbox"] {
+      appearance:none; width:16px; height:16px; margin-top:2px;
+      border:1px solid var(--fg-muted); border-radius:3px;
+      background:transparent; cursor:pointer; position:relative; flex-shrink:0;
+    }
+    .mc input:checked { background:var(--accent); border-color:var(--accent); }
+    .mc input:checked::after {
+      content:'✓'; position:absolute; top:-1px; left:2px;
+      font-size:12px; color:#fff; font-weight:700;
+    }
+
+    /* 픽셀 아바타 */
+    .pxa {
+      width:36px; height:36px; flex-shrink:0; position:relative;
+      image-rendering:pixelated;
+    }
+    .pxa svg { width:100%; height:100%; image-rendering:pixelated; }
+    .mc:hover .pxa { animation:bounce .3s ease; }
+    @keyframes bounce { 0%{transform:translateY(0)} 40%{transform:translateY(-3px)} 100%{transform:translateY(0)} }
+
+    .mi { flex:1; min-width:0; }
+    .mi-top { display:flex; align-items:center; gap:6px; }
+    .mi-name { font-size:13px; font-weight:600; color:var(--fg-bright); }
+    .mi-role {
+      font-size:11px; color:var(--fg-dim); padding:0 5px;
+      background:rgba(255,255,255,.06); border-radius:3px; white-space:nowrap;
+    }
+    .mi-meta { display:flex; align-items:center; gap:8px; margin-top:4px; }
+
+    /* 연차 바 */
+    .xbar { display:flex; align-items:center; gap:4px; }
+    .xlv { font-size:10px; font-weight:500; }
+    .xlv.junior{color:#4fc1ff} .xlv.mid{color:#dcdcaa} .xlv.senior{color:#ce9178} .xlv.lead{color:#c586c0}
+    .xtrack { width:48px; height:3px; background:rgba(255,255,255,.1); border-radius:2px; overflow:hidden; }
+    .xfill { height:100%; border-radius:2px; }
+    .xfill.junior{background:#4fc1ff;width:15%} .xfill.mid{background:#dcdcaa;width:40%}
+    .xfill.senior{background:#ce9178;width:70%} .xfill.lead{background:#c586c0;width:100%}
+    .xyr { font-size:10px; color:var(--fg-dim); min-width:22px; }
+
+    /* 연봉 뱃지 */
+    .sal { font-size:10px; font-weight:600; letter-spacing:-.5px; }
+    .sal.low{color:#6a9955} .sal.medium{color:#dcdcaa} .sal.high{color:#c586c0}
+
+    /* 빈 상태 */
+    .empty {
+      display:flex; align-items:center; gap:8px; padding:12px;
+      color:var(--fg-dim); font-size:12px; cursor:pointer; border-radius:6px;
+    }
+    .empty:hover { background:rgba(255,255,255,.04); }
+    .empty-i {
+      width:28px; height:28px; border:1px dashed var(--fg-muted);
+      border-radius:6px; display:flex; align-items:center; justify-content:center;
+      font-size:16px; color:var(--fg-muted);
+    }
+
+    /* === 사이드바 하단 === */
+    .sb-foot {
+      margin-top:auto; border-top:1px solid var(--border);
+      padding:12px; background:var(--bg-sidebar);
+    }
+    .cost { margin-bottom:12px; }
+    .cost-r { display:flex; justify-content:space-between; padding:2px 0; font-size:12px; color:var(--fg-dim); }
+    .cost-r span:last-child { color:var(--fg); font-weight:500; }
+    .cost-r.money span:last-child { color:var(--ok); }
+
+    .mconf { display:flex; flex-direction:column; gap:8px; }
+    .tinput {
+      width:100%; padding:6px 10px; background:var(--bg-input);
+      border:1px solid var(--border); border-radius:4px;
+      color:var(--fg); font-size:12px; font-family:inherit; outline:none;
+    }
+    .tinput:focus { border-color:var(--accent); }
+    .tinput::placeholder { color:var(--fg-muted); }
+
+    .modes { display:flex; gap:4px; }
+    .mbtn {
+      flex:1; padding:4px 0; background:var(--bg-input);
+      border:1px solid var(--border); border-radius:4px;
+      color:var(--fg-dim); font-size:10px; font-family:inherit; cursor:pointer;
+    }
+    .mbtn:hover { border-color:var(--fg-muted); color:var(--fg); }
+    .mbtn.on { background:rgba(0,122,204,.2); border-color:var(--accent); color:var(--accent); font-weight:600; }
+
+    .go-btn {
+      display:flex; align-items:center; justify-content:center; gap:6px;
+      width:100%; padding:8px; background:var(--accent); border:none; border-radius:4px;
+      color:#fff; font-size:13px; font-weight:600; font-family:inherit; cursor:pointer;
+    }
+    .go-btn:hover { background:var(--accent-h); }
+    .go-btn:active { transform:scale(.98); }
+
+    /* === 에디터 영역 === */
+    .editor { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+    .tabbar {
+      display:flex; height:35px; background:var(--bg-tab);
+      border-bottom:1px solid var(--border-s);
+    }
+    .tab {
+      display:flex; align-items:center; gap:6px; padding:0 16px;
+      font-size:12px; color:var(--fg-dim); border-right:1px solid var(--border-s);
+      cursor:pointer; white-space:nowrap; user-select:none;
+    }
+    .tab:hover { color:var(--fg); }
+    .tab.on {
+      background:var(--bg-tab-active); color:var(--fg-bright);
+      border-bottom:1px solid var(--accent); margin-bottom:-1px;
+    }
+    .tab-x { font-size:16px; opacity:0; cursor:pointer; }
+    .tab:hover .tab-x { opacity:.6; }
+
+    /* === 회의 패널 === */
+    .mpanel { flex:1; display:flex; flex-direction:column; overflow:hidden; background:var(--bg); }
+
+    .mhead { padding:16px 24px; border-bottom:1px solid var(--border-s); }
+    .mtopic { font-size:16px; font-weight:700; color:var(--fg-bright); margin-bottom:8px; }
+    .mmeta { display:flex; gap:8px; margin-bottom:12px; }
+    .mbadge { font-size:11px; padding:2px 8px; border-radius:10px; font-weight:500; }
+    .mbadge.mode { background:rgba(0,122,204,.15); color:var(--info); }
+    .mbadge.ppl { background:rgba(78,201,176,.15); color:var(--ok); }
+    .mbadge.st { font-weight:600; }
+    .mbadge.st.run { background:rgba(204,167,0,.15); color:var(--warn); animation:pulse 2s infinite; }
+    .mbadge.st.done { background:rgba(78,201,176,.15); color:var(--ok); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+
+    .pbar-t { display:flex; justify-content:space-between; font-size:11px; color:var(--fg-dim); margin-bottom:4px; }
+    .pbar { height:3px; background:rgba(255,255,255,.08); border-radius:2px; overflow:hidden; }
+    .pfill { height:100%; background:var(--accent); border-radius:2px; transition:width .5s ease; }
+
+    /* 에이전트 그리드 */
+    .agrid {
+      flex:1; display:grid; grid-template-columns:repeat(2,1fr);
+      gap:12px; padding:16px 24px; overflow-y:auto; align-content:start;
+    }
+    @media(min-width:1200px) { .agrid{grid-template-columns:repeat(3,1fr)} }
+    @media(min-width:1600px) { .agrid{grid-template-columns:repeat(4,1fr)} }
+
+    /* 에이전트 카드 */
+    .ac {
+      background:var(--bg-sidebar); border:1px solid var(--border-s);
+      border-radius:8px; overflow:hidden; display:flex; flex-direction:column;
+      transition:border-color .2s;
+    }
+    .ac:hover { border-color:var(--border); }
+    .ac.done { border-color:rgba(78,201,176,.3); }
+    .ac.streaming { border-color:rgba(0,122,204,.5); }
+    .ac.running { border-color:rgba(204,167,0,.3); }
+    .ac.error { border-color:rgba(241,76,76,.3); }
+
+    .ac-head {
+      display:flex; align-items:center; gap:8px;
+      padding:10px 12px; border-bottom:1px solid var(--border-s);
+    }
+    /* 카드 내 아바타 */
+    .ac-head .pxa { width:32px; height:32px; }
+    .ac-info { flex:1; min-width:0; }
+    .ac-name { font-size:12px; font-weight:600; color:var(--fg-bright); }
+    .ac-detail { font-size:10px; color:var(--fg-dim); display:flex; gap:6px; }
+    .ac-st { display:flex; align-items:center; gap:4px; font-size:11px; font-weight:500; flex-shrink:0; }
+    .sdot { width:7px; height:7px; border-radius:50%; }
+    .sdot.done{background:var(--ok)} .sdot.streaming{background:var(--accent);animation:blink 1s infinite}
+    .sdot.running{background:var(--warn);animation:blink 1.5s infinite} .sdot.error{background:var(--err)}
+    .sdot.idle{background:var(--fg-muted)}
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    .ac.streaming .pxa { animation:talk .5s steps(2) infinite; }
+    @keyframes talk { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-1px)} }
+    .ac.done .pxa::after {
+      content:'✓'; position:absolute; bottom:-2px; right:-2px;
+      font-size:8px; background:var(--ok); color:#fff;
+      width:12px; height:12px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center; font-weight:700;
+    }
+
+    .ac-body {
+      padding:10px 12px; font-size:12px; line-height:1.6; color:var(--fg);
+      flex:1; max-height:220px; overflow-y:auto; white-space:pre-wrap; word-break:break-word;
+    }
+    .ac-body::-webkit-scrollbar { width:6px; }
+    .ac-body::-webkit-scrollbar-thumb { background:rgba(255,255,255,.15); border-radius:3px; }
+    .ac-body strong { color:var(--fg-bright); font-weight:600; }
+    .ac-body code {
+      background:rgba(255,255,255,.08); padding:1px 4px; border-radius:3px;
+      font-size:11px; font-family:'Cascadia Code','Fira Code',monospace;
+    }
+    .ac-body pre {
+      background:rgba(0,0,0,.3); padding:8px 10px; border-radius:4px;
+      margin:6px 0; overflow-x:auto; font-size:11px;
+      font-family:'Cascadia Code','Fira Code',monospace;
+    }
+    .ac-body.empty-body {
+      display:flex; align-items:center; justify-content:center;
+      color:var(--fg-muted); font-style:italic;
+    }
+    .cursor {
+      display:inline-block; width:2px; height:14px; background:var(--accent);
+      margin-left:2px; animation:cblink .8s infinite; vertical-align:text-bottom;
+    }
+    @keyframes cblink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    .ac-foot {
+      padding:6px 12px; border-top:1px solid var(--border-s);
+      display:flex; justify-content:space-between; font-size:10px; color:var(--fg-muted);
+    }
+
+    /* 요약 */
+    .summary {
+      margin:0 24px 12px; background:rgba(0,122,204,.06);
+      border:1px solid rgba(0,122,204,.2); border-radius:8px; overflow:hidden;
+    }
+    .sum-h {
+      display:flex; align-items:center; gap:8px; padding:10px 14px;
+      font-size:13px; font-weight:600; color:var(--info);
+      border-bottom:1px solid rgba(0,122,204,.15);
+    }
+    .sum-c { padding:12px 14px; font-size:12px; line-height:1.7; }
+
+    /* 하단 액션 */
+    .mactions {
+      display:flex; align-items:center; gap:8px; padding:10px 24px;
+      border-top:1px solid var(--border-s); background:var(--bg-sidebar);
+    }
+    .mactions .spacer { flex:1; }
+    .abtn {
+      display:flex; align-items:center; gap:5px; padding:5px 12px;
+      border-radius:4px; font-size:12px; font-family:inherit; cursor:pointer;
+      border:1px solid transparent; transition:all .12s;
+    }
+    .abtn.pri { background:var(--accent); color:#fff; font-weight:600; }
+    .abtn.pri:hover { background:var(--accent-h); }
+    .abtn.sec { background:transparent; border-color:var(--border); color:var(--fg-dim); }
+    .abtn.sec:hover { border-color:var(--fg-muted); color:var(--fg); }
+    .abtn:disabled { opacity:.4; cursor:not-allowed; }
+
+    /* 상태바 */
+    .sbar {
+      display:flex; align-items:center; justify-content:space-between;
+      height:22px; background:var(--statusbar); padding:0 10px;
+      font-size:11px; color:rgba(255,255,255,.8);
+    }
+    .sbar-l,.sbar-r { display:flex; gap:12px; }
+
+    /* 스크롤바 */
+    ::-webkit-scrollbar { width:10px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:rgba(255,255,255,.12); border-radius:5px; border:2px solid transparent; background-clip:padding-box; }
+    ::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,.2); background-clip:padding-box; }
+    ::selection { background:rgba(0,122,204,.4); }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <!-- 타이틀바 -->
+    <div class="titlebar">
+      <div class="dots"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span></div>
+      <div class="titlebar-t">claude_team_gui — Visual Studio Code</div>
+    </div>
+
+    <div class="main">
+      <!-- Activity Bar -->
+      <div class="actbar">
+        <div class="act-icon" title="Explorer">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7V17C3 18.1 3.9 19 5 19H19C20.1 19 21 18.1 21 17V9C21 7.9 20.1 7 19 7H13L11 5H5C3.9 5 3 5.9 3 7Z"/></svg>
+        </div>
+        <div class="act-icon" title="Search">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </div>
+        <div class="act-icon on" title="Claude Team">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+      </div>
+
+      <!-- 사이드바 -->
+      <div class="sidebar">
+        <div class="sb-head">
+          <span class="sb-title">Claude Team</span>
+          <div class="sb-actions">
+            <button class="ib" title="새로고침"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-h" onclick="togSec(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            <span>정규직 (글로벌)</span><span class="badge">8</span>
+          </div>
+          <div class="sec-c" id="team-list"></div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-h off" onclick="togSec(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            <span>비정규직 (프로젝트)</span><span class="badge">0</span>
+          </div>
+          <div class="sec-c" style="display:none">
+            <div class="empty"><div class="empty-i">+</div><span>계약직 채용</span></div>
+          </div>
+        </div>
+
+        <div class="sb-foot">
+          <div class="cost">
+            <div class="cost-r"><span>참여</span><span id="cnt">7/8명</span></div>
+            <div class="cost-r"><span>예상 비용</span><span id="tok">~16,800 토큰</span></div>
+            <div class="cost-r money"><span>예상 금액</span><span id="usd">~$0.11</span></div>
+          </div>
+          <div class="mconf">
+            <input class="tinput" id="topic" placeholder="회의 주제를 입력하세요..." value="VS Code Extension 아키텍처 리뷰">
+            <div class="modes">
+              <button class="mbtn" data-m="meeting">단독</button>
+              <button class="mbtn" data-m="multi">역할극</button>
+              <button class="mbtn" data-m="agent">에이전트</button>
+              <button class="mbtn on" data-m="team">팀</button>
+            </div>
+            <button class="go-btn" id="go" onclick="startMeeting()">▶ 회의 시작</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 에디터 -->
+      <div class="editor">
+        <div class="tabbar">
+          <div class="tab"><span>📄</span> extension.ts <span class="tab-x">×</span></div>
+          <div class="tab on"><span>🤖</span> Claude Team Meeting <span class="tab-x">×</span></div>
+        </div>
+        <div class="mpanel">
+          <div class="mhead">
+            <div class="mtopic">VS Code Extension 아키텍처 리뷰</div>
+            <div class="mmeta">
+              <span class="mbadge mode">meeting-team</span>
+              <span class="mbadge ppl">8명 참여</span>
+              <span class="mbadge st run" id="st-badge">진행 중</span>
+            </div>
+            <div class="pbar-t"><span id="p-label">5/8 완료</span><span id="p-pct">62%</span></div>
+            <div class="pbar"><div class="pfill" id="pfill" style="width:62%"></div></div>
+          </div>
+          <div class="agrid" id="agrid"></div>
+          <div class="summary" id="sum" style="display:none">
+            <div class="sum-h">📋 회의 요약</div>
+            <div class="sum-c" id="sum-c"></div>
+          </div>
+          <div class="mactions">
+            <button class="abtn sec" onclick="location.reload()">⏹ 중단</button>
+            <div class="spacer"></div>
+            <button class="abtn sec" id="b-copy" disabled>📋 Markdown 복사</button>
+            <button class="abtn sec" id="b-save" disabled>💾 결과 저장</button>
+            <button class="abtn pri" id="b-new" disabled>＋ 새 회의</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sbar">
+      <div class="sbar-l"><span>main</span><span>0 문제</span></div>
+      <div class="sbar-r"><span>Claude Team v0.1.0</span><span>TypeScript</span></div>
+    </div>
+  </div>
+
+<script>
+// ========== 픽셀아트 캐릭터 데이터 (16×16) ==========
+const PX = {
+  jimin: { // PD — 왕관 + 보라 정장
+    p:{1:'#1a1a2e',2:'#f5d6b8',3:'#7c3aed',4:'#5b21b6',5:'#2d1b69',6:'#fbbf24',7:'#f59e0b',8:'#fff',9:'#1e1e1e'},
+    g:[[0,0,0,0,0,6,7,6,7,6,0,0,0,0,0,0],[0,0,0,0,6,7,6,7,6,7,6,0,0,0,0,0],[0,0,0,0,1,5,5,5,5,5,1,0,0,0,0,0],[0,0,0,1,5,5,5,5,5,5,5,1,0,0,0,0],[0,0,0,1,2,2,2,2,2,2,2,1,0,0,0,0],[0,0,0,1,2,9,2,2,2,9,2,1,0,0,0,0],[0,0,0,1,2,2,2,1,2,2,2,1,0,0,0,0],[0,0,0,0,1,2,2,2,2,2,1,0,0,0,0,0],[0,0,0,0,0,1,2,2,2,1,0,0,0,0,0,0],[0,0,0,0,1,3,3,3,3,3,1,0,0,0,0,0],[0,0,0,1,3,3,8,8,8,3,3,1,0,0,0,0],[0,0,1,3,3,3,3,3,3,3,3,3,1,0,0,0],[0,0,1,4,3,3,6,3,3,3,4,3,1,0,0,0],[0,0,0,1,1,3,3,3,3,1,1,0,0,0,0,0],[0,0,0,0,1,4,4,0,4,4,1,0,0,0,0,0],[0,0,0,0,1,1,1,0,1,1,1,0,0,0,0,0]]
+  },
+  hyunwoo: { // 기획리서치 — 안경 + 파랑
+    p:{1:'#1a1a2e',2:'#f5d6b8',3:'#3b82f6',4:'#1d4ed8',5:'#374151',6:'#60a5fa',7:'#fff',8:'#93c5fd',9:'#1e1e1e'},
+    g:[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,5,5,5,5,5,0,0,0,0,0,0],[0,0,0,0,5,5,5,5,5,5,5,0,0,0,0,0],[0,0,0,1,5,5,5,5,5,5,5,1,0,0,0,0],[0,0,0,1,2,2,2,2,2,2,2,1,0,0,0,0],[0,0,0,1,6,8,6,2,6,8,6,1,0,0,0,0],[0,0,0,1,2,9,2,6,2,9,2,1,0,0,0,0],[0,0,0,0,1,2,2,2,2,2,1,0,0,0,0,0],[0,0,0,0,0,1,2,2,2,1,0,0,0,0,0,0],[0,0,0,0,1,3,3,3,3,3,1,0,0,0,0,0],[0,0,0,1,3,3,3,3,3,3,3,1,0,0,0,0],[0,0,1,3,3,3,7,7,3,3,3,3,1,0,0,0],[0,0,1,4,3,3,3,3,3,3,4,3,1,0,0,0],[0,0,0,1,1,3,3,3,3,1,1,0,0,0,0,0],[0,0,0,0,1,4,4,0,4,4,1,0,0,0,0,0],[0,0,0,0,1,1,1,0,1,1,1,0,0,0,0,0]]
+  },
+  soyeon: { // 기획전략 — 긴머리 + 진파랑
+    p:{1:'#1a1a2e',2:'#f5d6b8',3:'#2563eb',4:'#1e40af',5:'#92400e',6:'#b45309',7:'#fff',8:'#fbbf24',9:'#1e1e1e'},
+    g:[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,5,5,5,5,5,5,0,0,0,0,0,0],[0,0,0,5,5,6,6,6,6,5,5,0,0,0,0,0],[0,0,5,1,5,5,5,5,5,5,1,5,0,0,0,0],[0,0,5,1,2,2,2,2,2,2,1,5,0,0,0,0],[0,0,5,1,2,9,2,2,2,9,1,5,0,0,0,0],[0,0,5,1,2,2,2,1,2,2,1,5,0,0,0,0],[0,0,5,0,1,2,2,2,2,1,0,5,0,0,0,0],[0,0,5,0,0,1,2,2,1,0,0,5,0,0,0,0],[0,0,0,0,1,3,3,3,3,3,1,0,0,0,0,0],[0,0,0,1,3,3,8,3,3,3,3,1,0,0,0,0],[0,0,1,3,3,3,3,3,3,3,3,3,1,0,0,0],[0,0,1,4,3,3,3,3,3,3,4,3,1,0,0,0],[0,0,0,1,1,3,3,3,3,1,1,0,0,0,0,0],[0,0,0,0,1,4,4,0,4,4,1,0,0,0,0,0],[0,0,0,0,1,1,1,0,1,1,1,0,0,0,0,0]]
+  },
+  taejun: { // 백엔드 — 후드 + 초록
+    p:{1:'#1a1a2e',2:'#f5d6b8',3:'#10b981',4:'#047857',5:'#1f2937',6:'#34d399',7:'#fff',8:'#6ee7b7',9:'#1e1e1e'},
+    g:[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,5,5,5,5,5,0,0,0,0,0,0],[0,0,0,0,5,5,5,5,5,5,5,0,0,0,0,0],[0,0,0,1,5,5,5,5,5,5,5,1,0,0,0,0],[0,0,0,1,2,2,2,2,2,2,2,1,0,0,0,0],[0,0,0,1,2,9,2,2,2,9,2,1,0,0,0,0],[0,0,0,1,2,2,2,2,2,2,2,1,0,0,0,0],[0,0,0,0,1,2,2,2,2,2,1,0,0,0,0,0],[0,0,0,0,0,1,2,2,2,1,0,0,0,0,0,0],[0,0,0,3,1,3,3,3,3,3,1,3,0,0,0,0],[0,0,3,3,3,3,3,3,3,3,3,3,3,0,0,0],[0,0,3,3,3,8,8,3,8,8,3,3,3,0,0,0],[0,0,1,4,3,8,6,3,6,8,3,4,1,0,0,0],[0,0,0,1,1,3,3,3,3,1,1,0,0,0,0,0],[0,0,0,0,1,1,1,0,1,1,1,0,0,0,0,0],[0,0,0,0,1,1,1,0,1,1,1,0,0,0,0,0]]
+  },
+  mirae: { // 프론트엔드 — 포니테일 + 청록
+    p:{1:'#1a1a2e',2:'#f5d6b8',3:'#06b6d4',4:'#0891b2',5:'#4b5563',6:'#9ca3af',7:'#fff',8:'#67e8f9',9:'#1e1e1e'},
+    g:[[0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0],[0,0,0,0,0,5,5,5,5,5,5,5,0,0,0,0],[0,0,0,0,5,5,6,6,6,5,5,5,0,0,0,0],[0,0,0,1,5,5,5,5,5,5,1,5,0,0,0,0],[0,0,0,1,2,2,2,2,2,2,1,0,5,0,0,0],[0,0,0,1,2,9,2,2,2,9,1,0,0,5,0,0],[0,0,0,1,2,2,2,2,2,2,1,0,0,5,0,0],[0,0,0,0,1,2,2,2,2,1,0,0,0,5,0,0],[0,0,0,0,0,1,2,2,1,0,0,0,0,0,0,0],[0,0,0,0,1,3,3,3,3,3,1,0,0,0,0,0],[0,0,0,1,3,3,7,7,3,3,3,1,0,0,0,0],[0,0,1,3,3,3,3,3,3,3,3,3,1,0,0,0],[0,0,1,4,3,3,3,3,3,3,4,3,1,0,0,0],[0,0,0,1,1,3,3,3,3,1,1,0,0,0,0,0],[0,0,0,0,1,4,4,0,4,4,1,0,0,0,0,0],[0,0,0,0,1,1,1,0,1,1,1,0,0,0,0,0]]
+  },
+  yunseo: { // QA — 안전모 + 노랑
+    p:{1:'#1a1a2e',2:'#f5d6b8',3:'#eab308',4:'#ca8a04',5:'#374151',6:'#fbbf24',7:'#fff',8:'#fde047',9:'#1e1e1e'},
+    g:[[0,0,0,0,6,6,6,6,6,6,6,0,0,0,0,0],[0,0,0,6,3,3,8,3,8,3,3,6,0,0,0,0],[0,0,0,0,1,5,5,5,5,5,1,0,0,0,0,0],[0,0,0,1,5,5,5,5,5,5,5,1,0,0,0,0],[0,0,0,1,2,2,2,2,2,2,2,1,0,0,0,0],[0,0,0,1,2,9,2,2,2,9,2,1,0,0,0,0],[0,0,0,1,2,2,2,2,2,2,2,1,0,0,0,0],[0,0,0,0,1,2,2,2,2,2,1,0,0,0,0,0],[0,0,0,0,0,1,2,2,2,1,0,0,0,0,0,0],[0,0,0,0,1,3,3,3,3,3,1,0,0,0,0,0],[0,0,0,1,3,3,7,7,3,3,3,1,0,0,0,0],[0,0,1,3,3,3,3,3,3,3,3,3,1,0,0,0],[0,0,1,4,3,3,3,3,3,3,4,3,1,0,0,0],[0,0,0,1,1,3,3,3,3,1,1,0,0,0,0,0],[0,0,0,0,1,4,4,0,4,4,1,0,0,0,0,0],[0,0,0,0,1,1,1,0,1,1,1,0,0,0,0,0]]
+  },
+  daeun: { // UI — 베레모 + 핑크
+    p:{1:'#1a1a2e',2:'#f5d6b8',3:'#ec4899',4:'#be185d',5:'#78350f',6:'#f472b6',7:'#fff',8:'#f9a8d4',9:'#1e1e1e'},
+    g:[[0,0,0,0,3,3,3,3,3,0,0,0,0,0,0,0],[0,0,0,3,6,6,6,6,6,3,0,0,0,0,0,0],[0,0,0,0,5,5,5,5,5,5,5,0,0,0,0,0],[0,0,5,1,5,5,5,5,5,5,1,5,0,0,0,0],[0,0,5,1,2,2,2,2,2,2,1,5,0,0,0,0],[0,0,5,1,2,9,2,2,2,9,1,5,0,0,0,0],[0,0,0,1,2,2,2,2,2,2,1,0,0,0,0,0],[0,0,0,0,1,2,8,2,2,1,0,0,0,0,0,0],[0,0,0,0,0,1,2,2,1,0,0,0,0,0,0,0],[0,0,0,0,1,3,3,3,3,3,1,0,0,0,0,0],[0,0,0,1,3,3,7,7,3,3,3,1,0,0,0,0],[0,0,1,3,3,3,3,3,3,3,3,3,1,0,0,0],[0,0,1,4,3,3,3,3,3,3,4,3,1,0,0,0],[0,0,0,1,1,3,3,3,3,1,1,0,0,0,0,0],[0,0,0,0,1,4,4,0,4,4,1,0,0,0,0,0],[0,0,0,0,1,1,1,0,1,1,1,0,0,0,0,0]]
+  },
+  seungho: { // UX — 비니 + 오렌지
+    p:{1:'#1a1a2e',2:'#f5d6b8',3:'#f97316',4:'#c2410c',5:'#1f2937',6:'#fb923c',7:'#fff',8:'#fdba74',9:'#1e1e1e'},
+    g:[[0,0,0,0,0,4,4,4,4,4,0,0,0,0,0,0],[0,0,0,0,4,3,3,6,3,3,4,0,0,0,0,0],[0,0,0,0,1,5,5,5,5,5,1,0,0,0,0,0],[0,0,0,1,5,5,5,5,5,5,5,1,0,0,0,0],[0,0,0,1,2,2,2,2,2,2,2,1,0,0,0,0],[0,0,0,1,2,9,2,2,2,9,2,1,0,0,0,0],[0,0,0,1,2,2,2,2,2,2,2,1,0,0,0,0],[0,0,0,0,1,2,2,2,2,2,1,0,0,0,0,0],[0,0,0,0,0,1,2,2,2,1,0,0,0,0,0,0],[0,0,0,0,1,3,3,3,3,3,1,0,0,0,0,0],[0,0,0,1,3,3,7,3,7,3,3,1,0,0,0,0],[0,0,1,3,3,3,3,3,3,3,3,3,1,0,0,0],[0,0,1,4,3,3,3,3,3,3,4,3,1,0,0,0],[0,0,0,1,1,3,3,3,3,1,1,0,0,0,0,0],[0,0,0,0,1,4,4,0,4,4,1,0,0,0,0,0],[0,0,0,0,1,1,1,0,1,1,1,0,0,0,0,0]]
+  }
+};
+
+function pxSvg(id, sz) {
+  const c = PX[id]; if (!c) return '';
+  const ps = sz / 16;
+  let r = '';
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const ci = c.g[y][x]; if (!ci) continue;
+    r += `<rect x="${x*ps}" y="${y*ps}" width="${ps+.5}" height="${ps+.5}" fill="${c.p[ci]}"/>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${sz} ${sz}" width="${sz}" height="${sz}" style="image-rendering:pixelated">${r}</svg>`;
+}
+
+// ========== 데이터 ==========
+const TEAM = [
+  {id:'jimin',  name:'지민', role:'PD',       label:'프로젝트 디렉터',   exp:10, lv:'senior', sal:'high',   on:true},
+  {id:'hyunwoo',name:'현우', role:'PLANNER',  label:'기획 · 리서치',     exp:5,  lv:'mid',    sal:'medium', on:true},
+  {id:'soyeon', name:'소연', role:'PLANNER',  label:'기획 · 전략',       exp:8,  lv:'senior', sal:'medium', on:true},
+  {id:'taejun', name:'태준', role:'BACKEND',  label:'백엔드 개발',        exp:6,  lv:'mid',    sal:'medium', on:true},
+  {id:'mirae',  name:'미래', role:'FRONTEND', label:'프론트엔드 개발',    exp:3,  lv:'junior', sal:'medium', on:true},
+  {id:'yunseo', name:'윤서', role:'QA',       label:'QA',               exp:5,  lv:'mid',    sal:'medium', on:true},
+  {id:'daeun',  name:'다은', role:'UI',       label:'UI 디자인',         exp:4,  lv:'mid',    sal:'medium', on:false},
+  {id:'seungho',name:'승호', role:'UX',       label:'UX 디자인',         exp:7,  lv:'mid',    sal:'medium', on:true},
+];
+
+const SAL = {low:{l:'₩',m:'Haiku'}, medium:{l:'₩₩',m:'Sonnet'}, high:{l:'₩₩₩',m:'Opus'}};
+
+const RESPONSES = [
+  {id:'jimin',  st:'done',      md:'Opus',   ct:'**[Go]** 2.5주 일정 내 구현 가능합니다.\n\n**타임라인 영향 분석:**\n- Phase 1~2 (기반+팀원UI): 병목 없음\n- **Phase 3 (회의 실행)이 크리티컬 패스** — 8명 병렬 스트리밍 + 에러 핸들링이 전체 일정의 60%\n\n**리스크:**\n- Webview ↔ Extension Host 메시지 유실 → ACK 패턴 필수\n- API rate limit 8명 동시 → stagger 전략 필요'},
+  {id:'hyunwoo',st:'done',      md:'Sonnet', ct:'**타깃 사용자:** Claude Code + VS Code 사용 개발자\n\n**핵심 유스케이스:**\n1. 코딩 중 아키텍처 결정 → 사이드바에서 즉시 팀 회의\n2. PR 전 코드 리뷰 → 다각도 피드백\n3. 기획 문서 → 기획자·개발자·QA 관점 동시 확보\n\n**Must:** 팀원 선택, 회의 실행, 결과 확인'},
+  {id:'soyeon', st:'done',      md:'Sonnet', ct:'**전략:** VS Code 마켓플레이스에 \'멀티에이전트 팀 회의\' 카테고리 없음. First mover.\n\n**v1 KPI:**\n- 설치 100+ (첫 달)\n- 회의 실행률 70%+\n\n**포지셔닝:** "AI 팀원을 VS Code 안에서 바로 소환"'},
+  {id:'taejun', st:'done',      md:'Sonnet', ct:'**구현 방안:**\n```typescript\nasync function runMeeting(config) {\n  const tasks = config.participants\n    .map(m => runAgent(m, config.topic));\n  return Promise.allSettled(tasks);\n}\n```\n\n**모델 매핑:**\n```typescript\nconst MODEL_MAP = {\n  low: \'claude-haiku-4-5-20251001\',\n  medium: \'claude-sonnet-4-6\',\n  high: \'claude-opus-4-6\'\n};\n```'},
+  {id:'mirae',  st:'done',      md:'Sonnet', ct:'**컴포넌트 체크리스트:**\n\n사이드바:\n- `TeamList.tsx` → 목록 컨테이너\n- `MemberCard.tsx` → 카드\n- `CostEstimate.tsx` → 비용 표시\n\n패널:\n- `AgentCard.tsx` → 스트리밍 카드\n- `ProgressBar.tsx` → 진행률'},
+  {id:'yunseo', st:'streaming', md:'Sonnet', ct:'**리스크 등급:**\n\n[CRITICAL] API 키 보안\n- SecretStorage에서만 관리\n\n[HIGH] 8명 동시 스트리밍\n- Webview 렌더링 부하 → 디바운스 100ms'},
+  {id:'seungho',st:'streaming', md:'Sonnet', ct:'**사용자 플로우:**\n\n1. 사이드바에서 팀원 확인 → 참여자 토글\n2. 주제 입력 → 회의 방식 선택\n3. ▶ 시작 → 패널 자동 열림'},
+  {id:'daeun',  st:'running',   md:'Sonnet', ct:''},
+];
+
+// ========== 렌더링 ==========
+function renderTeam() {
+  const el = document.getElementById('team-list');
+  el.innerHTML = TEAM.map(m => {
+    const s = SAL[m.sal];
+    return `<div class="mc ${m.on ? 'sel' : 'off'}" onclick="tog('${m.id}')">
+      <input type="checkbox" ${m.on ? 'checked' : ''} onclick="event.stopPropagation();tog('${m.id}')">
+      <div class="pxa">${pxSvg(m.id, 36)}</div>
+      <div class="mi">
+        <div class="mi-top"><span class="mi-name">${m.name}</span><span class="mi-role">${m.label}</span></div>
+        <div class="mi-meta">
+          <div class="xbar">
+            <span class="xlv ${m.lv}">${m.lv}</span>
+            <div class="xtrack"><div class="xfill ${m.lv}"></div></div>
+            <span class="xyr">${m.exp}y</span>
+          </div>
+          <span class="sal ${m.sal}">${s.l} ${s.m}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderGrid() {
+  const el = document.getElementById('agrid');
+  const ST = {done:{l:'완료',c:'done'}, streaming:{l:'응답 중',c:'streaming'}, running:{l:'대기 중',c:'running'}};
+  el.innerHTML = RESPONSES.map(r => {
+    const m = TEAM.find(t => t.id === r.id);
+    const s = ST[r.st] || {l:'대기', c:'idle'};
+    const isStream = r.st === 'streaming';
+    const isEmpty = !r.ct;
+    let h = r.ct || '';
+    h = h.replace(/\*\*\[([^\]]+)\]\*\*/g, '<strong>[$1]</strong>');
+    h = h.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+    h = h.replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre>$2</pre>');
+    h = h.replace(/\n/g, '<br>');
+    const cur = isStream ? '<span class="cursor"></span>' : '';
+    return `<div class="ac ${r.st}">
+      <div class="ac-head">
+        <div class="pxa">${pxSvg(r.id, 32)}</div>
+        <div class="ac-info">
+          <div class="ac-name">${m ? m.name : r.id}</div>
+          <div class="ac-detail"><span>${m ? m.lv : ''}</span><span>·</span><span>${r.md}</span></div>
+        </div>
+        <div class="ac-st"><span class="sdot ${s.c}"></span><span>${s.l}</span></div>
+      </div>
+      <div class="ac-body ${isEmpty ? 'empty-body' : ''}">${isEmpty ? '응답 대기 중...' : h + cur}</div>
+      ${r.st === 'done' ? `<div class="ac-foot"><span>~2,100 토큰</span><span>12.3초</span></div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function updCost() {
+  const on = TEAM.filter(m => m.on), tot = TEAM.length;
+  const TC = {low:1200, medium:2100, high:3200};
+  const UP = {low:.000001, medium:.000006, high:.00003};
+  let tk = 0, ud = 0;
+  on.forEach(m => { tk += TC[m.sal]; ud += TC[m.sal] * UP[m.sal]; });
+  document.getElementById('cnt').textContent = `${on.length}/${tot}명`;
+  document.getElementById('tok').textContent = `~${tk.toLocaleString()} 토큰`;
+  document.getElementById('usd').textContent = `~$${ud.toFixed(2)}`;
+}
+
+function tog(id) {
+  const m = TEAM.find(t => t.id === id);
+  if (m) { m.on = !m.on; renderTeam(); updCost(); }
+}
+
+function togSec(h) {
+  h.classList.toggle('off');
+  const c = h.nextElementSibling;
+  c.style.display = c.style.display === 'none' ? 'block' : 'none';
+}
+
+document.querySelectorAll('.mbtn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.mbtn').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+  });
+});
+
+// ========== 회의 시뮬레이션 ==========
+function startMeeting() {
+  const btn = document.getElementById('go');
+  btn.textContent = '⏳ 진행 중...'; btn.style.background = '#d97706';
+  simulate();
+}
+
+function simulate() {
+  const R = RESPONSES;
+  let done = R.filter(r => r.st === 'done').length;
+  const tot = R.length;
+
+  const si = R.findIndex(r => r.st === 'streaming');
+  if (si >= 0) {
+    setTimeout(() => {
+      R[si].st = 'done'; R[si].ct += '\n\n(분석 완료)';
+      done++; updP(done, tot); renderGrid();
+      const si2 = R.findIndex(r => r.st === 'streaming');
+      if (si2 >= 0) {
+        setTimeout(() => {
+          R[si2].st = 'done'; R[si2].ct += '\n\n(분석 완료)';
+          done++; updP(done, tot); renderGrid();
+          const ri = R.findIndex(r => r.st === 'running');
+          if (ri >= 0) {
+            setTimeout(() => {
+              R[ri].st = 'streaming';
+              R[ri].ct = '**디자인 토큰:**\n\nVS Code 테마 변수 → Primitive 토큰 매핑:\n- `--vscode-editor-background` → `color.bg.primary`\n- `--vscode-foreground` → `color.text.primary`';
+              renderGrid();
+              setTimeout(() => {
+                R[ri].st = 'done'; done++;
+                updP(done, tot); renderGrid(); finish();
+              }, 3000);
+            }, 1000);
+          } else { finish(); }
+        }, 1500);
+      }
+    }, 2000);
+  }
+}
+
+function updP(d, t) {
+  const p = Math.round(d / t * 100);
+  document.getElementById('p-label').textContent = `${d}/${t} 완료`;
+  document.getElementById('p-pct').textContent = `${p}%`;
+  document.getElementById('pfill').style.width = `${p}%`;
+}
+
+function finish() {
+  document.getElementById('st-badge').className = 'mbadge st done';
+  document.getElementById('st-badge').textContent = '완료';
+  const btn = document.getElementById('go');
+  btn.textContent = '✓ 완료!'; btn.style.background = '#047857';
+  document.getElementById('b-copy').disabled = false;
+  document.getElementById('b-save').disabled = false;
+  document.getElementById('b-new').disabled = false;
+  const s = document.getElementById('sum'); s.style.display = 'block';
+  document.getElementById('sum-c').innerHTML = `
+    <strong>전원 합의:</strong><br>
+    • VS Code Extension + Webview 아키텍처 적합<br>
+    • Phase 3 (회의 실행)이 크리티컬 패스 — 8명 병렬 스트리밍 집중<br>
+    • API 키는 Extension Host에서만 관리<br>
+    • v1은 meeting-team 집중, 나머지 v2<br><br>
+    <strong>미결:</strong> 글로벌 팀원 경로 충돌 확인, rate limit stagger 전략<br><br>
+    <strong>비용:</strong> 총 ~18,100 토큰 · $0.12 · 38초
+  `;
+}
+
+// ========== 초기화 ==========
+renderTeam(); renderGrid(); updCost();
+</script>
+</body>
+</html>
