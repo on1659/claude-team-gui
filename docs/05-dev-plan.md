@@ -5,65 +5,45 @@
 ## 현재 상태
 
 - CLI 스킬 3종 검증 완료 (`/meeting-multi`, `/meeting-agent`, `/meeting-team`)
-- 팀원 프로필 8명 정의됨
+- 팀원 프로필 8명 정의됨 + **2축 시스템 (연차+연봉) 완성**
 - 개념 문서 정리 완료
-- **다음 단계: 핵심 아키텍처 결정 → 개발 시작**
+- **Phase 0 확정 완료 → Phase 1 개발 시작 가능**
 
 ---
 
-## 핵심 결정 사항 (개발 전 확정 필요)
+## 핵심 결정 사항 (확정됨 — 2026-03-12)
 
 ### 1. GUI가 에이전트를 어떻게 실행하는가?
 
-이것이 기술 스택 전체를 결정한다.
-
-#### 옵션 A: Anthropic API 직접 호출 (권장)
+**확정: Anthropic API 직접 호출 (옵션 A)**
 
 ```
-GUI App
-  → Anthropic API (claude-opus-4-6)
-  → 병렬 API 호출 (에이전트 수만큼)
-  → 결과 수집 → UI에 표시
+VS Code Extension Host
+  → Anthropic API (모델은 팀원별 연봉 등급에 따라 결정)
+  → 병렬 API 호출 (선택된 에이전트 수만큼)
+  → 스트리밍 결과 → Webview에 실시간 표시
 ```
-
-- **장점**: 독립 앱으로 동작 (Claude Code 불필요), 프레임워크 자유 선택
-- **단점**: 기존 `.claude/commands/` 스킬 재사용 불가 → 로직을 코드로 재구현
-- **profiles.md**: 파일로 계속 유지 or JSON으로 전환
-
-#### 옵션 B: Claude Code CLI 프로세스 실행
-
-```
-GUI App
-  → claude 프로세스 spawn → /meeting-agent 실행
-  → 출력 스트림 파싱 → UI에 표시
-```
-
-- **장점**: 기존 스킬 그대로 재사용
-- **단점**: Claude Code 설치 필수, 출력 파싱 복잡, 안정성 낮음
-
-> **결론**: 옵션 A가 현실적. 스킬 로직을 앱 내부에 재구현하는 것이 더 견고함.
 
 ### 2. 프레임워크
 
-| 옵션 | 장점 | 단점 | 파일 접근 |
-|------|------|------|----------|
-| **Electron** | 검증된 생태계, React 사용 | 번들 크기 큼 (~150MB) | 가능 |
-| **Tauri** | 경량 (~10MB), 빠름 | Rust 필요 | 가능 |
-| **Next.js (웹앱)** | 배포 쉬움, 공유 가능 | 로컬 파일 직접 접근 불가 | 불가 (API 서버 필요) |
+**확정: VS Code Extension (Webview Panel + React)**
 
-> 로컬 `profiles.md` 읽기/쓰기가 핵심 기능이므로 **Electron 또는 Tauri** 권장.
-> 개발 편의성 우선이면 Electron, 성능·용량 우선이면 Tauri.
+| 검토 | 결과 |
+|------|------|
+| Electron | 오버킬 — 별도 앱 불필요, 보조툴 성격에 안 맞음 |
+| Tauri | Rust 필요, 역시 별도 앱 |
+| 웹앱 | 로컬 파일 접근 불가 |
+| **VS Code Extension** | **채택** — 이미 VS Code 안에서 작업, 설치 부담 0 |
 
 ### 3. 데이터 모델
 
-현재 `profiles.md` (Markdown) → 앱 내에서 파싱 필요.
+**확정: profiles.json (JSON 전환)**
 
-선택지:
-- **MD 유지**: 사람이 직접 수정하기 쉬움, 파싱 로직 필요
-- **JSON 전환**: 앱 처리 쉬움, 사람이 직접 수정 불편
-- **MD + JSON 병행**: MD를 소스로 유지, 앱 실행 시 JSON으로 변환
+- `meeting-team-profiles.md` → `profiles.json`으로 마이그레이션
+- v1에서는 GUI 편집 UI 없이 JSON 파일 직접 수정
+- v2에서 GUI 편집 UI 추가
 
-> MD를 소스로 유지하되, 앱 내부에서 JSON으로 파싱해서 사용하는 방식 권장.
+> 상세 개발 계획은 [07-vscode-extension-plan.md](07-vscode-extension-plan.md) 참조
 
 ---
 
@@ -125,8 +105,8 @@ GUI App
 
 | 항목 | 상태 | 결정 필요 시점 |
 |------|------|--------------|
-| 아키텍처 방식 | 미결 | Phase 0 |
-| 프레임워크 | 미결 | Phase 0 |
-| 데이터 모델 | 미결 | Phase 0 |
-| API 키 관리 방법 | 미결 | Phase 1 |
-| 글로벌 팀원 경로 (`~/.claude/`) | 확인 필요 | Phase 1 |
+| 아키텍처 방식 | ✅ API 직접 호출 | Phase 0 |
+| 프레임워크 | ✅ VS Code Extension | Phase 0 |
+| 데이터 모델 | ✅ profiles.json | Phase 0 |
+| API 키 관리 방법 | ✅ VS Code SecretStorage | Phase 1 |
+| 팀원 데이터 범위 | ✅ 워크스페이스 단위 (글로벌 없음) | Phase 0 |
