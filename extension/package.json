@@ -1,0 +1,137 @@
+{
+  "name": "claude-team-gui",
+  "displayName": "Claude Team",
+  "description": "AI 팀원과 함께하는 멀티에이전트 회의",
+  "version": "0.1.0",
+  "publisher": "claude-team",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other", "AI"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "claude-team",
+          "title": "Claude Team",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "claude-team": [
+        {
+          "type": "webview",
+          "id": "claudeTeam.sidebar",
+          "name": "Team",
+          "retainContextWhenHidden": true
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "claudeTeam.startMeeting",
+        "title": "Claude Team: 회의 시작",
+        "icon": "$(play)"
+      },
+      {
+        "command": "claudeTeam.openPanel",
+        "title": "Claude Team: 회의 패널 열기",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "claudeTeam.setApiKey",
+        "title": "Claude Team: API 키 설정"
+      },
+      {
+        "command": "claudeTeam.clearApiKey",
+        "title": "Claude Team: API 키 초기화"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "claudeTeam.startMeeting",
+          "when": "view == claudeTeam.sidebar",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "claudeTeam.startMeeting",
+          "when": "editorHasSelection",
+          "group": "claude-team"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Claude Team",
+      "properties": {
+        "claudeTeam.defaultMode": {
+          "type": "string",
+          "enum": ["quick", "deep"],
+          "default": "deep",
+          "description": "기본 회의 방식 (quick: 빠른 회의 ~$0.01, deep: 심층 회의 ~$0.10)"
+        },
+        "claudeTeam.staggerDelayMs": {
+          "type": "number",
+          "default": 200,
+          "minimum": 50,
+          "maximum": 1000,
+          "description": "심층 회의 시 에이전트 간 API 호출 딜레이 (ms)"
+        },
+        "claudeTeam.maxTokensPerAgent": {
+          "type": "number",
+          "default": 2048,
+          "minimum": 512,
+          "maximum": 8192,
+          "description": "에이전트당 최대 출력 토큰 수"
+        },
+        "claudeTeam.maxRetries": {
+          "type": "number",
+          "default": 2,
+          "minimum": 0,
+          "maximum": 5,
+          "description": "에이전트 실패 시 최대 재시도 횟수"
+        }
+      }
+    }
+  },
+
+  "scripts": {
+    "dev": "concurrently \"npm run dev:extension\" \"npm run dev:webview\"",
+    "dev:extension": "node esbuild.config.mjs --watch",
+    "dev:webview": "vite build --watch",
+    "build": "npm run build:extension && npm run build:webview",
+    "build:extension": "node esbuild.config.mjs",
+    "build:webview": "vite build",
+    "package": "npm run build && vsce package",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "@vscode/vsce": "^2.0.0",
+    "concurrently": "^8.0.0",
+    "esbuild": "^0.20.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.0",
+    "@google/generative-ai": "^0.21.0",
+    "openai": "^4.0.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0"
+  }
+}

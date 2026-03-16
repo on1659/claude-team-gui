@@ -1,0 +1,42 @@
+:root {
+  /* PixelAvatar */
+  --avatar-size-sidebar: 36px;
+  --avatar-size-card: 32px;
+
+  /* AgentCard */
+  --card-radius: 8px;
+  --card-body-max-height: 220px;
+
+  /* StatusDot */
+  --dot-size: 7px;
+
+  /* Cursor (스트리밍) */
+  --cursor-width: 2px;
+  --cursor-height: 14px;
+  --cursor-color: var(--color-state-active);
+
+  /* XpBar (연차 바) */
+  --xp-track-height: 3px;
+  --xp-track-width: 48px;
+}
+
+/* AgentCard animations */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes talk {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1px); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

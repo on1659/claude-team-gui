@@ -1,0 +1,23 @@
+:root {
+  /* 배경 */
+  --color-bg-base: var(--vscode-editor-background);
+  --color-bg-elevated: var(--vscode-sideBar-background);
+  --color-bg-input: var(--vscode-input-background);
+
+  /* 텍스트 */
+  --color-text-primary: var(--vscode-editor-foreground);
+  --color-text-secondary: var(--vscode-descriptionForeground);
+  --color-text-muted: var(--vscode-disabledForeground);
+  --color-text-base: var(--vscode-foreground);
+
+  /* 테두리 */
+  --color-border-base: var(--vscode-panel-border);
+  --color-border-subtle: var(--vscode-editorGroup-border);
+
+  /* 상태 */
+  --color-state-active: var(--vscode-focusBorder);
+  --color-state-success: var(--vscode-terminal-ansiGreen);
+  --color-state-warn: var(--vscode-editorWarning-foreground);
+  --color-state-error: var(--vscode-editorError-foreground);
+  --color-state-info: var(--vscode-textLink-foreground);
+}
