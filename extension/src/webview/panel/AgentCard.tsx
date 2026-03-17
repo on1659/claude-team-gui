@@ -61,7 +61,7 @@ function getStatusLabel(state: AgentState): string {
     case 'streaming': return '';
     case 'done': return '';
     case 'error': return state.message;
-    case 'retrying': return `재시도 중... (${state.attempt}/${state.attempt})`;
+    case 'retrying': return `재시도 중... (${state.attempt}회)`;
   }
 }
 
@@ -164,7 +164,7 @@ export function AgentCard({ agentId, name, roleLabel, state, onRetry }: AgentCar
           </span>
         )}
         {state.type === 'error' && (
-          <div style={{ color: 'var(--color-state-error)' }}>
+          <div role="alert" style={{ color: 'var(--color-state-error)' }}>
             ⚠ {state.message}
           </div>
         )}

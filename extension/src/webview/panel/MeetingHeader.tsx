@@ -1,4 +1,5 @@
 import React from 'react';
+import { ProgressBar } from './ProgressBar';
 
 interface MeetingHeaderProps {
   topic: string;
@@ -61,24 +62,8 @@ export function MeetingHeader({
       </div>
 
       {/* Progress bar */}
-      {phase === 'running' && totalCount > 0 && (
-        <div style={{
-          height: '3px',
-          background: 'var(--color-border-subtle)',
-          borderRadius: '2px',
-          overflow: 'hidden',
-        }}>
-          <div style={{
-            height: '100%',
-            width: `${progress}%`,
-            background: 'var(--color-state-active)',
-            borderRadius: '2px',
-            transition: 'width 0.3s ease',
-          }} />
-        </div>
-      )}
-      {phase === 'done' && (
-        <div style={{ height: '3px', background: 'var(--color-state-success)', borderRadius: '2px' }} />
+      {(phase === 'running' || phase === 'done' || phase === 'cancelled') && (
+        <ProgressBar progress={progress} phase={phase} />
       )}
     </div>
   );

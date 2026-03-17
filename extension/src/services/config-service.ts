@@ -42,15 +42,29 @@ export class ConfigService {
     providerId: string,
     apiKey: string,
   ): Promise<{ valid: boolean; error?: string }> {
+    if (!apiKey || !apiKey.trim()) {
+      return { valid: false, error: 'API 키를 입력해주세요' };
+    }
+
     const provider = this.registry.getAll().find(p => p.id === providerId);
     if (!provider) return { valid: false, error: `Unknown provider: ${providerId}` };
 
     const valid = await provider.validateKey(apiKey);
     if (!valid) return { valid: false, error: 'API 키 검증 실패 — 키를 다시 확인하세요' };
 
+    // 기존 키 백업 (저장 실패 시 롤백용)
+    const oldKey = await this.secrets.get(`claude-team.apiKey.${providerId}`) ?? null;
     try {
       await this.secrets.store(`claude-team.apiKey.${providerId}`, apiKey);
     } catch (err: any) {
+      // 실패 시 롤백 시도
+      if (oldKey !== null) {
+        try {
+          await this.secrets.store(`claude-team.apiKey.${providerId}`, oldKey);
+        } catch {
+          // 롤백 실패는 무시 (best-effort)
+        }
+      }
       return { valid: false, error: `Failed to store key: ${err.message}` };
     }
 

@@ -177,19 +177,16 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       }
 
       case 'startMeeting': {
-        console.log(`[Sidebar] startMeeting — topic="${message.topic}", participants=${message.participants.length}, mode=${message.mode}`);
         if (!this.meetingService) {
           console.error('[Sidebar] startMeeting — NO meetingService!');
           break;
         }
         this.panelManager.show();
-        console.log('[Sidebar] panelManager.show() called');
 
         const participants = message.participants
           .map(id => this.profileManager.getMember(id))
           .filter((m): m is import('./types/team').TeamMember => !!m);
 
-        console.log(`[Sidebar] resolved participants: ${participants.map(p => p.id).join(', ')} (${participants.length}/${message.participants.length})`);
         if (participants.length === 0) {
           console.warn('[Sidebar] No valid participants found — aborting');
           break;
@@ -217,15 +214,18 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         // Notify sidebar only (MeetingService will notify panel)
         this.post({ type: 'meetingStarted', meetingId: meetingConfig.id, participants: message.participants, topic: message.topic, mode: message.mode });
 
-        console.log(`[Sidebar] calling meetingService.startMeeting(${meetingConfig.id})`);
         this.meetingService.startMeeting(meetingConfig);
-        console.log(`[Sidebar] meetingService.startMeeting() returned — async meeting running`);
         break;
       }
     }
   }
 
   handlePanelMessage(message: WebviewMessage): void {
+    const ALLOWED_MESSAGE_TYPES = ['getTeam', 'cancelMeeting', 'copyResult', 'saveResult', 'retryAgent'] as const;
+    if (!ALLOWED_MESSAGE_TYPES.includes(message.type as typeof ALLOWED_MESSAGE_TYPES[number])) {
+      console.warn(`[Security] Unknown message type rejected: ${message.type}`);
+      return;
+    }
     switch (message.type) {
       case 'getTeam': {
         // Panel also requests team data for display names

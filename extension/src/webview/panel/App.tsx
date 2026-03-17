@@ -6,6 +6,7 @@ import { AgentGrid } from './AgentGrid';
 import { OfficeView } from './OfficeView';
 import { ChatLogPanel } from './ChatLogPanel';
 import { ActionBar } from './ActionBar';
+import { SummaryView } from './SummaryView';
 import { agentReducer } from './types';
 import type { AgentState, MeetingState } from './types';
 import type { HostMessage, TeamMemberView } from '../../types/messages';
@@ -99,11 +100,8 @@ export function App(): React.ReactElement {
 
   const postMessage = useVscodeMessage(
     useCallback((msg: HostMessage) => {
-      console.log(`[Panel] ← received: ${msg.type}`, 'agentId' in msg ? `agent=${(msg as any).agentId}` : '');
-
       switch (msg.type) {
         case 'teamData': {
-          console.log(`[Panel] teamData — ${(msg.members as TeamMemberView[]).length} members`);
           // Store agent display info
           setAgentInfos((msg.members as TeamMemberView[]).map(m => ({
             id: m.id,
@@ -113,7 +111,6 @@ export function App(): React.ReactElement {
           break;
         }
         case 'meetingStarted': {
-          console.log(`[Panel] meetingStarted — id=${msg.meetingId} participants=${msg.participants.join(',')} mode=${msg.mode}`);
           lastSeqMap.current.clear();
           const agents: Record<string, AgentState> = {};
           for (const id of msg.participants) {
@@ -140,9 +137,6 @@ export function App(): React.ReactElement {
           if (msg.seq > lastSeq + 1) {
             console.warn(`[Panel] seq gap! agent=${msg.agentId} expected=${lastSeq + 1} got=${msg.seq}`);
           }
-          if (msg.seq <= 2 || msg.seq % 20 === 0) {
-            console.log(`[Panel] agentStream agent=${msg.agentId} seq=${msg.seq} chunkLen=${msg.chunk.length}`);
-          }
           lastSeqMap.current.set(msg.agentId, msg.seq);
 
           // Buffer chunk for rAF flush
@@ -150,7 +144,6 @@ export function App(): React.ReactElement {
           break;
         }
         case 'agentDone': {
-          console.log(`[Panel] agentDone agent=${msg.agentId} contentLen=${msg.result.content.length} tokens=${msg.result.tokenUsage.inputTokens}+${msg.result.tokenUsage.outputTokens} duration=${msg.result.durationMs}ms`);
           // Flush any pending rAF-buffered chunks before transitioning to done
           chunkBuffer.flushAgent(msg.agentId);
           dispatchAgent(msg.agentId, {
@@ -171,7 +164,6 @@ export function App(): React.ReactElement {
           break;
         }
         case 'meetingDone': {
-          console.log(`[Panel] meetingDone — cost=${msg.summary.totalCost} duration=${msg.summary.totalDurationMs}ms`);
           setMeeting(prev => ({
             ...prev,
             phase: 'done',
@@ -180,12 +172,11 @@ export function App(): React.ReactElement {
           break;
         }
         case 'meetingCancelled': {
-          console.log(`[Panel] meetingCancelled`);
           setMeeting(prev => {
             const agents = { ...prev.agents };
             for (const [id, state] of Object.entries(agents)) {
               if (state.type === 'streaming' || state.type === 'selected' || state.type === 'retrying') {
-                agents[id] = { type: 'idle' };
+                agents[id] = { type: 'error', message: '취소됨', retryable: false, attempt: 0 };
               }
             }
             return { ...prev, agents, phase: 'cancelled' };
@@ -210,7 +201,6 @@ export function App(): React.ReactElement {
 
   // Request team data for display names (this also signals "panel ready" to the host)
   React.useEffect(() => {
-    console.log('[Panel] mounted — sending getTeam (this triggers host message flush)');
     postMessage({ type: 'getTeam' });
   }, [postMessage]);
 
@@ -245,10 +235,16 @@ export function App(): React.ReactElement {
   }
 
   function handleRetry(agentId: string) {
-    if (meeting.meetingId) {
-      dispatchAgent(agentId, { type: 'RETRY' });
-      postMessage({ type: 'retryAgent', meetingId: meeting.meetingId, agentId });
-    }
+    if (!meeting.meetingId) return;
+
+    // Guard: only allow retry when the agent is in error state with retryable=true.
+    // This prevents duplicate postMessages if the button is clicked while the agent
+    // is already retrying/streaming, and blocks requests for non-retryable errors.
+    const agentState = meeting.agents[agentId];
+    if (!agentState || agentState.type !== 'error' || !agentState.retryable) return;
+
+    dispatchAgent(agentId, { type: 'RETRY' });
+    postMessage({ type: 'retryAgent', meetingId: meeting.meetingId, agentId });
   }
 
   if (meeting.phase === 'idle') {
@@ -269,26 +265,7 @@ export function App(): React.ReactElement {
   }
 
   const summarySection = meeting.phase === 'done' && meeting.summary ? (
-    <div style={{
-      margin: '8px 16px',
-      padding: '12px',
-      borderRadius: '8px',
-      border: '1px solid var(--color-border-subtle)',
-      background: 'var(--color-bg-elevated)',
-    }}>
-      <div style={{
-        fontSize: '12px',
-        fontWeight: 600,
-        color: 'var(--color-text-primary)',
-        marginBottom: '8px',
-      }}>
-        회의 요약
-      </div>
-      <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', display: 'flex', gap: '12px' }}>
-        <span>총 비용: ${meeting.summary.totalCost.toFixed(4)}</span>
-        <span>소요 시간: {(meeting.summary.totalDurationMs / 1000).toFixed(1)}초</span>
-      </div>
-    </div>
+    <SummaryView summary={meeting.summary} />
   ) : null;
 
   return (

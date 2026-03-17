@@ -37,7 +37,6 @@ export class AnthropicProvider implements LLMProvider {
   ): AsyncGenerator<LLMStreamEvent> {
     if (!this.client) throw new Error('API key not set — call setApiKey() or setAuthToken() first');
 
-    console.log(`[Anthropic] streamMessage: model=${model}, messages=${messages.length}`);
 
     let stream: ReturnType<typeof this.client.messages.stream>;
 

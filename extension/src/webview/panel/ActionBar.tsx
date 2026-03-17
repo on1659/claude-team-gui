@@ -10,15 +10,15 @@ interface ActionBarProps {
 }
 
 const COPY_LABELS = {
-  idle: '📋 Markdown 복사',
-  pending: '⏳ 복사 중...',
+  idle: <><span aria-hidden="true">📋</span> Markdown 복사</>,
+  pending: <><span aria-hidden="true">⏳</span> 복사 중...</>,
   success: '✓ 복사됨',
   failed: '✗ 복사 실패',
 };
 
 const SAVE_LABELS = {
-  idle: '💾 결과 저장',
-  pending: '⏳ 저장 중...',
+  idle: <><span aria-hidden="true">💾</span> 결과 저장</>,
+  pending: <><span aria-hidden="true">⏳</span> 저장 중...</>,
   success: '✓ 저장됨',
   failed: '✗ 저장 실패',
 };
@@ -68,6 +68,7 @@ export function ActionBar({ phase, copyStatus, saveStatus, onCancel, onCopy, onS
       {phase === 'running' && (
         <ActionButton
           label="⏹ 중단"
+          ariaLabel="회의 중단"
           color="var(--color-state-error)"
           onClick={onCancel}
         />
@@ -75,12 +76,14 @@ export function ActionBar({ phase, copyStatus, saveStatus, onCancel, onCopy, onS
       <div style={{ flex: 1 }} />
       <ActionButton
         label={copyLabel}
+        ariaLabel="Markdown으로 복사"
         color={copyColor}
         onClick={onCopy}
         disabled={!isDone || copyStatus === 'pending'}
       />
       <ActionButton
         label={saveLabel}
+        ariaLabel="파일로 저장"
         color={saveColor}
         onClick={onSave}
         disabled={!isDone || saveStatus === 'pending'}
@@ -91,11 +94,13 @@ export function ActionBar({ phase, copyStatus, saveStatus, onCancel, onCopy, onS
 
 function ActionButton({
   label,
+  ariaLabel,
   color,
   onClick,
   disabled = false,
 }: {
-  label: string;
+  label: React.ReactNode;
+  ariaLabel: string;
   color: string;
   onClick: () => void;
   disabled?: boolean;
@@ -104,6 +109,7 @@ function ActionButton({
     <button
       onClick={onClick}
       disabled={disabled}
+      aria-label={ariaLabel}
       style={{
         padding: '4px 10px',
         fontSize: '11px',

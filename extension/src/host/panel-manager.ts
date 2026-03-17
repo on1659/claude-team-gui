@@ -18,12 +18,10 @@ export class PanelManager {
 
   show(): void {
     if (this.panel) {
-      console.log('[PanelManager] show() — panel already exists, revealing');
       this.panel.reveal(vscode.ViewColumn.One);
       return;
     }
 
-    console.log('[PanelManager] show() — creating NEW panel (ready=false)');
     // New panel — webview JS hasn't loaded yet
     this.ready = false;
     this.pendingMessages = [];
@@ -48,7 +46,6 @@ export class PanelManager {
         // First message from webview = JS has loaded and listener is active
         if (!this.ready) {
           this.ready = true;
-          console.log(`[PanelManager] Webview ready — flushing ${this.pendingMessages.length} buffered messages`);
           for (const msg of this.pendingMessages) {
             this.panel?.webview.postMessage(msg);
           }
@@ -72,11 +69,9 @@ export class PanelManager {
     }
     if (!this.ready) {
       // Webview JS not loaded yet — buffer for later
-      console.log(`[PanelManager] post(${message.type}) — BUFFERED (pending=${this.pendingMessages.length + 1})`);
       this.pendingMessages.push(message);
       return;
     }
-    console.log(`[PanelManager] post(${message.type}) — sent directly`);
     this.panel.webview.postMessage(message);
   }
 

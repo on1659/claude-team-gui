@@ -37,15 +37,10 @@ export function useChunkBuffer(
   const scheduleFlush = useCallback(() => {
     if (flushRef.current !== null) cancelAnimationFrame(flushRef.current);
     flushRef.current = requestAnimationFrame(() => {
-      const agentCount = pendingChunks.current.size;
-      if (agentCount > 0) {
-        console.log(`[ChunkBuffer] rAF flush — ${agentCount} agents`);
-      }
       for (const [id, chunks] of pendingChunks.current) {
         chunks.sort((a, b) => a.seq - b.seq);
         const text = chunks.map(c => c.text).join('');
         const lastSeq = chunks[chunks.length - 1].seq;
-        console.log(`[ChunkBuffer] rAF agent=${id} chunks=${chunks.length} textLen=${text.length} lastSeq=${lastSeq}`);
         onFlush(id, text, lastSeq);
       }
       pendingChunks.current.clear();
@@ -71,11 +66,8 @@ export function useChunkBuffer(
         chunks.sort((a, b) => a.seq - b.seq);
         const text = chunks.map(c => c.text).join('');
         const lastSeq = chunks[chunks.length - 1].seq;
-        console.log(`[ChunkBuffer] flushAgent(${agentId}) — sync ${chunks.length} chunks, textLen=${text.length}`);
         onFlush(agentId, text, lastSeq);
         pendingChunks.current.delete(agentId);
-      } else {
-        console.log(`[ChunkBuffer] flushAgent(${agentId}) — nothing pending`);
       }
     },
     [onFlush],

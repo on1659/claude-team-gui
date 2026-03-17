@@ -36,7 +36,6 @@ export class ClaudeCodeProvider implements LLMProvider {
     if (this.available !== null) return this.available;
 
     return new Promise((resolve) => {
-      console.log('[ClaudeCode] Detecting CLI availability...');
       const proc = spawn('claude', ['--version'], {
         shell: true,
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -48,7 +47,6 @@ export class ClaudeCodeProvider implements LLMProvider {
 
       proc.on('close', (code) => {
         this.available = code === 0;
-        console.log(`[ClaudeCode] detect result: code=${code}, available=${this.available}, version=${stdout.trim()}`);
         resolve(this.available);
       });
 
@@ -90,8 +88,6 @@ export class ClaudeCodeProvider implements LLMProvider {
       ? `[시스템 지시사항]\n${options.system}\n\n[사용자 메시지]\n${prompt}`
       : prompt;
 
-    console.log(`[ClaudeCode] Spawning: claude ${args.join(' ')}`);
-    console.log(`[ClaudeCode] model=${model}, hasSystem=${!!options?.system}, maxTokens=${options?.maxTokens}, stdinLen=${stdinPayload.length}`);
 
     const proc = spawn('claude', args, {
       shell: true,
@@ -103,12 +99,10 @@ export class ClaudeCodeProvider implements LLMProvider {
     proc.stdin?.write(stdinPayload);
     proc.stdin?.end();
 
-    console.log(`[ClaudeCode] Process spawned, pid=${proc.pid}, stdin written (${stdinPayload.length} chars)`);
 
     // Handle abort
     if (options?.signal) {
       options.signal.addEventListener('abort', () => {
-        console.log(`[ClaudeCode] Abort signal received, killing process`);
         proc.kill();
       }, { once: true });
     }
@@ -117,7 +111,6 @@ export class ClaudeCodeProvider implements LLMProvider {
     proc.stderr?.on('data', (chunk: Buffer) => {
       const text = chunk.toString();
       stderrData += text;
-      console.log(`[ClaudeCode] stderr: ${text.trim()}`);
     });
 
     yield* this.processStream(proc, options?.signal);
@@ -131,7 +124,6 @@ export class ClaudeCodeProvider implements LLMProvider {
       }
     });
 
-    console.log(`[ClaudeCode] Process exited with code ${exitCode}`);
 
     if (exitCode !== null && exitCode !== 0) {
       console.error(`[ClaudeCode] Process FAILED with code ${exitCode}: ${stderrData}`);
@@ -160,11 +152,9 @@ export class ClaudeCodeProvider implements LLMProvider {
     let eventCount = 0;
     let deltaCount = 0;
 
-    console.log('[ClaudeCode] processStream — starting to read stdout');
 
     for await (const chunk of stdout) {
       if (signal?.aborted) {
-        console.log('[ClaudeCode] processStream — aborted, killing process');
         proc.kill();
         return;
       }
@@ -185,9 +175,6 @@ export class ClaudeCodeProvider implements LLMProvider {
         }
 
         eventCount++;
-        if (eventCount <= 3 || eventCount % 20 === 0) {
-          console.log(`[ClaudeCode] event #${eventCount}: type=${event.type}`);
-        }
 
         // Extract text from assistant messages (cumulative text, compute delta)
         if (event.type === 'assistant' && event.message?.content) {
@@ -198,9 +185,6 @@ export class ClaudeCodeProvider implements LLMProvider {
                 const delta = newText.slice(lastText.length);
                 lastText = newText;
                 deltaCount++;
-                if (deltaCount <= 3) {
-                  console.log(`[ClaudeCode] delta #${deltaCount}: "${delta.slice(0, 50)}..." (totalLen=${newText.length})`);
-                }
                 yield { type: 'delta', chunk: delta };
               }
             }
@@ -213,7 +197,6 @@ export class ClaudeCodeProvider implements LLMProvider {
           const usage = event.usage ?? {};
           const inputTokens = (usage.input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0);
           const outputTokens = usage.output_tokens ?? 0;
-          console.log(`[ClaudeCode] RESULT — events=${eventCount} deltas=${deltaCount} tokens in=${inputTokens} out=${outputTokens} textLen=${lastText.length}`);
           yield {
             type: 'done',
             stopReason: event.stop_reason === 'max_tokens' ? 'max_tokens' : 'end_turn',
@@ -224,7 +207,6 @@ export class ClaudeCodeProvider implements LLMProvider {
       }
     }
 
-    console.log(`[ClaudeCode] stdout ended — gotResult=${gotResult} events=${eventCount} deltas=${deltaCount} textLen=${lastText.length}`);
 
     if (!gotResult) {
       if (lastText.length > 0) {

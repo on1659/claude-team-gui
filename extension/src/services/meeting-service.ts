@@ -37,12 +37,10 @@ export class MeetingService {
   }
 
   startMeeting(meetingConfig: MeetingConfig): string {
-    console.log(`[MeetingService] startMeeting(${meetingConfig.id}) — mode=${meetingConfig.mode}, participants=${meetingConfig.participants.map(m=>m.id).join(',')}`);
     const controller = new AbortController();
     this.controllers.set(meetingConfig.id, controller);
 
     // Notify panel
-    console.log(`[MeetingService] posting meetingStarted to panel`);
     this.panel.post({
       type: 'meetingStarted',
       meetingId: meetingConfig.id,
@@ -72,13 +70,11 @@ export class MeetingService {
     const signal = controller.signal;
 
     try {
-      console.log(`[Meeting] Starting ${config.mode} meeting: ${config.id}, provider: ${provider.id}, participants: ${config.participants.length}`);
       if (config.mode === 'quick') {
         await this.runQuickMeeting(config, provider, signal);
       } else {
         await this.runDeepMeeting(config, provider, signal);
       }
-      console.log(`[Meeting] Completed: ${config.id}`);
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
       console.error(`[Meeting] Error in ${config.id}:`, err);
@@ -159,7 +155,8 @@ export class MeetingService {
             this.emit(agentDoneMsg);
           }
 
-          const doneMsg = { type: 'meetingDone' as const, meetingId: config.id, summary: this.buildQuickSummary(parsed, event.usage, durationMs, mediumModel) };
+          const summary = await this.buildQuickSummary(parsed, event.usage, durationMs, mediumModel, provider, signal);
+          const doneMsg = { type: 'meetingDone' as const, meetingId: config.id, summary };
           this.panel.post(doneMsg);
           this.emit(doneMsg);
           return;
@@ -198,7 +195,7 @@ export class MeetingService {
     const results = await Promise.allSettled(tasks);
 
     if (!signal.aborted) {
-      const summary = this.buildDeepSummary(results, config);
+      const summary = await this.buildDeepSummary(results, config, provider, signal);
       const deepDoneMsg = { type: 'meetingDone' as const, meetingId: config.id, summary };
       this.panel.post(deepDoneMsg);
       this.emit(deepDoneMsg);
@@ -221,19 +218,37 @@ export class MeetingService {
     let fullContent = '';
     const startTime = Date.now();
 
-    console.log(`[MeetingService] runSingleAgent(${member.id}) — model=${model}, attempt=${attempt}`);
 
     // Per-agent timeout — abort if LLM hangs
     const timeoutController = new AbortController();
     const timeoutId = setTimeout(() => timeoutController.abort(), this.AGENT_TIMEOUT_MS);
-    const combinedSignal = signal.aborted ? signal : timeoutController.signal;
 
-    // Listen for parent abort to also cancel timeout
-    const onParentAbort = () => { timeoutController.abort(); clearTimeout(timeoutId); };
-    signal.addEventListener('abort', onParentAbort, { once: true });
+    // Combined signal: abort when either parent or timeout fires
+    const combinedController = new AbortController();
+    const abortCombined = () => { combinedController.abort(); };
+    const onParentAbort = () => { abortCombined(); clearTimeout(timeoutId); };
+    const onTimeoutAbort = () => { abortCombined(); };
+
+    if (signal.aborted) {
+      combinedController.abort();
+    } else {
+      signal.addEventListener('abort', onParentAbort, { once: true });
+    }
+    if (timeoutController.signal.aborted) {
+      combinedController.abort();
+    } else {
+      timeoutController.signal.addEventListener('abort', onTimeoutAbort, { once: true });
+    }
+
+    const combinedSignal = combinedController.signal;
+
+    const cleanup = () => {
+      clearTimeout(timeoutId);
+      signal.removeEventListener('abort', onParentAbort);
+      timeoutController.signal.removeEventListener('abort', onTimeoutAbort);
+    };
 
     try {
-      console.log(`[MeetingService] calling provider.streamMessage for agent=${member.id}`);
       for await (const event of provider.streamMessage(model, messages, { system, signal: combinedSignal })) {
         if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
         if (timeoutController.signal.aborted) throw new Error(`Timeout after ${this.AGENT_TIMEOUT_MS / 1000}s`);
@@ -241,9 +256,6 @@ export class MeetingService {
         switch (event.type) {
           case 'delta':
             fullContent += event.chunk;
-            if (seq % 10 === 0) {
-              console.log(`[MeetingService] agent=${member.id} delta seq=${seq} totalLen=${fullContent.length}`);
-            }
             this.panel.post({
               type: 'agentStream',
               meetingId,
@@ -253,15 +265,13 @@ export class MeetingService {
             });
             break;
           case 'done': {
-            clearTimeout(timeoutId);
-            signal.removeEventListener('abort', onParentAbort);
+            cleanup();
             const result: AgentResult = {
               content: fullContent,
               tokenUsage: event.usage,
               durationMs: Date.now() - startTime,
               model,
             };
-            console.log(`[MeetingService] agent=${member.id} DONE — tokens in=${event.usage.inputTokens} out=${event.usage.outputTokens} duration=${result.durationMs}ms content=${fullContent.length}chars`);
             const agentDoneMsg = { type: 'agentDone' as const, meetingId, agentId: member.id, result };
             this.panel.post(agentDoneMsg);
             this.emit(agentDoneMsg);
@@ -270,6 +280,7 @@ export class MeetingService {
           case 'error': {
             console.error(`[MeetingService] agent=${member.id} ERROR — ${event.message} retryable=${event.retryable}`);
             if (event.retryable && attempt <= this.MAX_RETRIES) {
+              cleanup();
               this.panel.post({
                 type: 'agentError',
                 meetingId,
@@ -293,13 +304,10 @@ export class MeetingService {
         }
       }
     } catch (err: unknown) {
+      cleanup();
       if (err instanceof DOMException && err.name === 'AbortError') {
-        clearTimeout(timeoutId);
-        signal.removeEventListener('abort', onParentAbort);
         throw err;
       }
-      clearTimeout(timeoutId);
-      signal.removeEventListener('abort', onParentAbort);
       if (err instanceof Error && attempt <= this.MAX_RETRIES) {
         this.panel.post({
           type: 'agentError',
@@ -321,8 +329,7 @@ export class MeetingService {
       throw err;
     }
 
-    clearTimeout(timeoutId);
-    signal.removeEventListener('abort', onParentAbort);
+    cleanup();
     throw new Error('Stream ended without done event');
   }
 
@@ -447,27 +454,36 @@ ${focusSection}${rulesSection}${styleSection}${formatSection}${skillSection}
 다른 팀원의 의견은 모르는 상태입니다.`;
   }
 
-  private buildQuickSummary(
+  private async buildQuickSummary(
     parsed: Record<string, string>,
     usage: { inputTokens: number; outputTokens: number },
     durationMs: number,
     model: string,
-  ): MeetingSummary {
+    provider: LLMProvider,
+    signal?: AbortSignal,
+  ): Promise<MeetingSummary> {
+    const totalCost = this.estimateTokenCost(usage.inputTokens, usage.outputTokens, model);
+    const allResponses = Object.values(parsed).join('\n\n');
+    const llmSummary = await this.generateSummaryViaLLM(allResponses, provider, signal);
+
     return {
-      agreements: [],
-      conflicts: [],
-      nextActions: [],
-      totalCost: this.estimateTokenCost(usage.inputTokens, usage.outputTokens, model),
+      agreements: llmSummary.agreements,
+      conflicts: llmSummary.conflicts,
+      nextActions: llmSummary.nextActions,
+      totalCost,
       totalDurationMs: durationMs,
     };
   }
 
-  private buildDeepSummary(
+  private async buildDeepSummary(
     results: PromiseSettledResult<AgentResult>[],
     _config: MeetingConfig,
-  ): MeetingSummary {
+    provider: LLMProvider,
+    signal?: AbortSignal,
+  ): Promise<MeetingSummary> {
     let totalCost = 0;
     let maxDuration = 0;
+    const contentParts: string[] = [];
 
     for (const r of results) {
       if (r.status === 'fulfilled') {
@@ -477,16 +493,83 @@ ${focusSection}${rulesSection}${styleSection}${formatSection}${skillSection}
           r.value.model,
         );
         maxDuration = Math.max(maxDuration, r.value.durationMs);
+        contentParts.push(r.value.content);
       }
     }
 
+    const allResponses = contentParts.join('\n\n');
+    const llmSummary = await this.generateSummaryViaLLM(allResponses, provider, signal);
+
     return {
-      agreements: [],
-      conflicts: [],
-      nextActions: [],
+      agreements: llmSummary.agreements,
+      conflicts: llmSummary.conflicts,
+      nextActions: llmSummary.nextActions,
       totalCost,
       totalDurationMs: maxDuration,
     };
+  }
+
+  private async generateSummaryViaLLM(
+    allResponses: string,
+    provider: LLMProvider,
+    signal?: AbortSignal,
+  ): Promise<{ agreements: string[]; conflicts: { topic: string; opinions: { agentId: string; opinion: string }[] }[]; nextActions: string[] }> {
+    const emptyResult = { agreements: [], conflicts: [], nextActions: [] };
+
+    try {
+      const model = this.getModelForTier(provider, 'low');
+      const system = `다음 팀 회의 내용을 분석하여 JSON으로 응답하세요. JSON만 출력하고 다른 텍스트는 포함하지 마세요.
+
+형식:
+{
+  "agreements": ["합의사항1", "합의사항2"],
+  "conflicts": [{"topic": "충돌주제", "opinions": [{"agentId": "이름", "opinion": "의견"}]}],
+  "nextActions": ["액션1", "액션2"]
+}`;
+
+      const messages: LLMMessage[] = [{ role: 'user', content: allResponses }];
+
+      let fullContent = '';
+      for await (const event of provider.streamMessage(model, messages, {
+        system,
+        maxTokens: 500,
+        signal,
+      })) {
+        switch (event.type) {
+          case 'delta':
+            fullContent += event.chunk;
+            break;
+          case 'done': {
+            // Extract JSON from response (handle possible markdown code blocks)
+            let jsonStr = fullContent.trim();
+            const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+            if (codeBlockMatch) {
+              jsonStr = codeBlockMatch[1].trim();
+            }
+            const parsed = JSON.parse(jsonStr);
+            return {
+              agreements: Array.isArray(parsed.agreements)
+                ? parsed.agreements.filter((a: unknown) => typeof a === 'string')
+                : [],
+              conflicts: Array.isArray(parsed.conflicts)
+                ? parsed.conflicts.filter((c: any) => c && typeof c.topic === 'string' && Array.isArray(c.opinions))
+                : [],
+              nextActions: Array.isArray(parsed.nextActions)
+                ? parsed.nextActions.filter((a: unknown) => typeof a === 'string')
+                : [],
+            };
+          }
+          case 'error':
+            console.error(`[MeetingService] generateSummaryViaLLM error: ${event.message}`);
+            return emptyResult;
+        }
+      }
+
+      return emptyResult;
+    } catch (err: unknown) {
+      console.error('[MeetingService] generateSummaryViaLLM failed:', err);
+      return emptyResult;
+    }
   }
 
   private estimateTokenCost(inputTokens: number, outputTokens: number, model: string): number {

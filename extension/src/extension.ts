@@ -25,7 +25,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const ccAvailable = await ccProvider.detect();
   if (ccAvailable) {
     registry.register(ccProvider);
-    console.log('[Claude Team] Claude Code CLI detected — registered as provider');
   }
 
   // API key providers (fallback)
@@ -197,7 +196,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
   );
 
-  console.log(`[Claude Team] Extension activated (v2.3) — Claude Code CLI: ${ccAvailable ? '사용 가능' : '미설치'}`);
 }
 
 export function deactivate(): void {
